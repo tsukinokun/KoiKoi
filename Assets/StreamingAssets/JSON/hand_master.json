@@ -1,0 +1,75 @@
+{
+  "yakus": [
+    /* --- 光札系の昇格式ルール --- */
+    {
+      "name": "五光",
+      "priority": 100,
+      "requiredType": "Hikari",
+      "requiredCount": 5,
+      "score": 15
+    },
+    {
+      "name": "四光",
+      "priority": 90,
+      "requiredType": "Hikari",
+      "requiredCount": 4,
+      "excludeTag": "Ame",
+      "score": 8
+    },
+    {
+      "name": "雨四光",
+      "priority": 80,
+      "requiredType": "Hikari",
+      "requiredCount": 4,
+      "mustIncludeTag": "Ame",
+      "score": 7
+    },
+    {
+      "name": "三光",
+      "priority": 70,
+      "requiredType": "Hikari",
+      "requiredCount": 3,
+      "excludeTag": "Ame",
+      "score": 5
+    },
+
+    /* --- 特殊役ルール --- */
+    {
+      "name": "猪鹿蝶",
+      "priority": 60,
+      "requiredTag": "Inoshikacho",
+      "requiredCount": 3,
+      "score": 5
+    },
+    {
+      "name": "赤短",
+      "priority": 55,
+      "requiredTag": "Akatan",
+      "requiredCount": 3,
+      "score": 5
+    },
+    {
+      "name": "青短",
+      "priority": 50,
+      "requiredTag": "Aotan",
+      "requiredCount": 3,
+      "score": 5
+    },
+
+    /* --- 酒の役（条件付き） --- */
+    {
+      "name": "花見で一杯",
+      "priority": 40,
+      "mustIncludeTag": "Sakazuki",
+      "requiredMonth": 3,
+      "score": 5
+    },
+    {
+      "name": "月見で一杯",
+      "priority": 30,
+      "mustIncludeTag": "Sakazuki",
+      "requiredMonth": 8,
+      "score": 5
+    }
+  ]
+}

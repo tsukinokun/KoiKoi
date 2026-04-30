@@ -1,0 +1,313 @@
+[
+  /* 1��: �� */
+  {
+    "id": "Card_01_01",
+    "month": 1,
+    "type": "Hikari",
+    "tags": [ "Matsu", "Tsuru" ]
+  },
+  {
+    "id": "Card_01_02",
+    "month": 1,
+    "type": "Tanzaku",
+    "tags": [ "Matsu", "Akatan" ]
+  },
+  {
+    "id": "Card_01_03",
+    "month": 1,
+    "type": "Kasu",
+    "tags": [ "Matsu" ]
+  },
+  {
+    "id": "Card_01_04",
+    "month": 1,
+    "type": "Kasu",
+    "tags": [ "Matsu" ]
+  },
+
+  /* 2��: �~ */
+  {
+    "id": "Card_02_01",
+    "month": 2,
+    "type": "Tane",
+    "tags": [ "Ume", "Uguisu" ]
+  },
+  {
+    "id": "Card_02_02",
+    "month": 2,
+    "type": "Tanzaku",
+    "tags": [ "Ume", "Akatan" ]
+  },
+  {
+    "id": "Card_02_03",
+    "month": 2,
+    "type": "Kasu",
+    "tags": [ "Ume" ]
+  },
+  {
+    "id": "Card_02_04",
+    "month": 2,
+    "type": "Kasu",
+    "tags": [ "Ume" ]
+  },
+
+  /* 3��: �� */
+  {
+    "id": "Card_03_01",
+    "month": 3,
+    "type": "Hikari",
+    "tags": [ "Sakura", "Maku" ]
+  },
+  {
+    "id": "Card_03_02",
+    "month": 3,
+    "type": "Tanzaku",
+    "tags": [ "Sakura", "Akatan" ]
+  },
+  {
+    "id": "Card_03_03",
+    "month": 3,
+    "type": "Kasu",
+    "tags": [ "Sakura" ]
+  },
+  {
+    "id": "Card_03_04",
+    "month": 3,
+    "type": "Kasu",
+    "tags": [ "Sakura" ]
+  },
+
+  /* 4��: �� */
+  {
+    "id": "Card_04_01",
+    "month": 4,
+    "type": "Tane",
+    "tags": [ "Fuji", "Hototogisu" ]
+  },
+  {
+    "id": "Card_04_02",
+    "month": 4,
+    "type": "Tanzaku",
+    "tags": [ "Fuji", "Tanzaku_Kusa" ]
+  },
+  {
+    "id": "Card_04_03",
+    "month": 4,
+    "type": "Kasu",
+    "tags": [ "Fuji" ]
+  },
+  {
+    "id": "Card_04_04",
+    "month": 4,
+    "type": "Kasu",
+    "tags": [ "Fuji" ]
+  },
+
+  /* 5��: �Ҋ� */
+  {
+    "id": "Card_05_01",
+    "month": 5,
+    "type": "Tane",
+    "tags": [ "Ayame", "Yatsuhashi" ]
+  },
+  {
+    "id": "Card_05_02",
+    "month": 5,
+    "type": "Tanzaku",
+    "tags": [ "Ayame", "Tanzaku_Kusa" ]
+  },
+  {
+    "id": "Card_05_03",
+    "month": 5,
+    "type": "Kasu",
+    "tags": [ "Ayame" ]
+  },
+  {
+    "id": "Card_05_04",
+    "month": 5,
+    "type": "Kasu",
+    "tags": [ "Ayame" ]
+  },
+
+  /* 6��: ���O */
+  {
+    "id": "Card_06_01",
+    "month": 6,
+    "type": "Tane",
+    "tags": [ "Botan", "Cho", "Inoshikacho" ]
+  },
+  {
+    "id": "Card_06_02",
+    "month": 6,
+    "type": "Tanzaku",
+    "tags": [ "Botan", "Aotan" ]
+  },
+  {
+    "id": "Card_06_03",
+    "month": 6,
+    "type": "Kasu",
+    "tags": [ "Botan" ]
+  },
+  {
+    "id": "Card_06_04",
+    "month": 6,
+    "type": "Kasu",
+    "tags": [ "Botan" ]
+  },
+
+  /* 7��: �� */
+  {
+    "id": "Card_07_01",
+    "month": 7,
+    "type": "Tane",
+    "tags": [ "Hagi", "Inoshishi", "Inoshikacho" ]
+  },
+  {
+    "id": "Card_07_02",
+    "month": 7,
+    "type": "Tanzaku",
+    "tags": [ "Hagi", "Tanzaku_Kusa" ]
+  },
+  {
+    "id": "Card_07_03",
+    "month": 7,
+    "type": "Kasu",
+    "tags": [ "Hagi" ]
+  },
+  {
+    "id": "Card_07_04",
+    "month": 7,
+    "type": "Kasu",
+    "tags": [ "Hagi" ]
+  },
+
+  /* 8��: �(������) */
+  {
+    "id": "Card_08_01",
+    "month": 8,
+    "type": "Hikari",
+    "tags": [ "Susuki", "Tsuki" ]
+  },
+  {
+    "id": "Card_08_02",
+    "month": 8,
+    "type": "Tane",
+    "tags": [ "Susuki", "Kari" ]
+  },
+  {
+    "id": "Card_08_03",
+    "month": 8,
+    "type": "Kasu",
+    "tags": [ "Susuki" ]
+  },
+  {
+    "id": "Card_08_04",
+    "month": 8,
+    "type": "Kasu",
+    "tags": [ "Susuki" ]
+  },
+
+  /* 9��: �e */
+  {
+    "id": "Card_09_01",
+    "month": 9,
+    "type": "Tane",
+    "tags": [ "Kiku", "Sakazuki" ]
+  },
+  {
+    "id": "Card_09_02",
+    "month": 9,
+    "type": "Tanzaku",
+    "tags": [ "Kiku", "Aotan" ]
+  },
+  {
+    "id": "Card_09_03",
+    "month": 9,
+    "type": "Kasu",
+    "tags": [ "Kiku" ]
+  },
+  {
+    "id": "Card_09_04",
+    "month": 9,
+    "type": "Kasu",
+    "tags": [ "Kiku" ]
+  },
+
+  /* 10��: �g�t */
+  {
+    "id": "Card_10_01",
+    "month": 10,
+    "type": "Tane",
+    "tags": [ "Momiji", "Shika", "Inoshikacho" ]
+  },
+  {
+    "id": "Card_10_02",
+    "month": 10,
+    "type": "Tanzaku",
+    "tags": [ "Momiji", "Aotan" ]
+  },
+  {
+    "id": "Card_10_03",
+    "month": 10,
+    "type": "Kasu",
+    "tags": [ "Momiji" ]
+  },
+  {
+    "id": "Card_10_04",
+    "month": 10,
+    "type": "Kasu",
+    "tags": [ "Momiji" ]
+  },
+
+  /* 11��: �� */
+  {
+    "id": "Card_11_01",
+    "month": 11,
+    "type": "Hikari",
+    "tags": [ "Yanagi", "Michikaze", "Ame" ]
+  },
+  {
+    "id": "Card_11_02",
+    "month": 11,
+    "type": "Tane",
+    "tags": [ "Yanagi", "Tsubame", "Ame" ]
+  },
+  {
+    "id": "Card_11_03",
+    "month": 11,
+    "type": "Tanzaku",
+    "tags": [ "Yanagi", "Ame" ]
+  },
+  {
+    "id": "Card_11_04",
+    "month": 11,
+    "type": "Kasu",
+    "tags": [ "Yanagi", "Ame_Oni" ]
+  },
+
+  /* 12��: �� */
+  {
+    "id": "Card_12_01",
+    "month": 12,
+    "type": "Hikari",
+    "tags": [ "Kiri", "Ho-o" ]
+  },
+  {
+    "id": "Card_12_02",
+    "month": 12,
+    "type": "Kasu",
+    "tags": [ "Kiri" ]
+  },
+  {
+    "id": "Card_12_03",
+    "month": 12,
+    "type": "Kasu",
+    "tags": [ "Kiri" ]
+  },
+  {
+    "id": "Card_12_04",
+    "month": 12,
+    "type": "Kasu",
+    "tags": [ "Kiri" ]
+  }
+]
