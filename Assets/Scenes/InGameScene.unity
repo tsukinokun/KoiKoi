@@ -211,7 +211,7 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1674011524
+--- !u!1 &352264723
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -219,39 +219,39 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 1674011526}
-  - component: {fileID: 1674011525}
+  - component: {fileID: 352264725}
+  - component: {fileID: 352264724}
   m_Layer: 0
-  m_Name: CardGenerator
+  m_Name: GameManager
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &1674011525
+--- !u!114 &352264724
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1674011524}
+  m_GameObject: {fileID: 352264723}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: aae7c83e31ed1de49ac5f38ab20efdf6, type: 3}
+  m_Script: {fileID: 11500000, guid: c85e19d368b1fed4a9744e4bba6a913f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
   cardAtlas: {fileID: 4343727234628468602, guid: dede874a0c49aac4cb1442d371f08af3, type: 2}
   cardPrefab: {fileID: 3403582605777476612, guid: 1fdc9263c7335f0469eb2ff7983ba01e, type: 3}
---- !u!4 &1674011526
+--- !u!4 &352264725
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1674011524}
+  m_GameObject: {fileID: 352264723}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: -0.13306, y: 2.48938, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -262,4 +262,4 @@ SceneRoots:
   m_ObjectHideFlags: 0
   m_Roots:
   - {fileID: 12733259}
-  - {fileID: 1674011526}
+  - {fileID: 352264725}

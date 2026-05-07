@@ -1,19 +1,32 @@
 using UnityEngine;
 
-// カード1枚の「見た目」と「データ」を保持する
 public class Card : MonoBehaviour
 {
-    private SpriteRenderer _spriteRenderer;
+    // このカードが持っているデータ
+    public CardData Data { get; private set; }
 
-    void Awake()
+    private Sprite _faceSprite;
+    private Sprite _backSprite;
+    private SpriteRenderer _sr;
+
+    // GameManagerから呼ばれる初期化関数
+    // 引数の数と型を、GameManagerの呼び出し側(data, face, back)と合わせるのがポイントです
+    public void Initialize(CardData data, Sprite face, Sprite back)
     {
-        _spriteRenderer = GetComponent<SpriteRenderer>();
+        this.Data = data;
+        this._faceSprite = face;
+        this._backSprite = back;
+
+        _sr = GetComponent<SpriteRenderer>();
+
+        // 最初は山札なので裏向き
+        SetFaceUp(false);
     }
 
-    // アトラスから受け取ったSpriteをセットする
-    public void SetVisual(Sprite sprite)
+    // 表裏を切り替える関数
+    public void SetFaceUp(bool isFaceUp)
     {
-        if (_spriteRenderer == null) _spriteRenderer = GetComponent<SpriteRenderer>();
-        _spriteRenderer.sprite = sprite;
+        if (_sr == null) _sr = GetComponent<SpriteRenderer>();
+        _sr.sprite = isFaceUp ? _faceSprite : _backSprite;
     }
 }
