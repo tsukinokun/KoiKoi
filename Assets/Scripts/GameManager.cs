@@ -83,12 +83,14 @@ public class GameManager : MonoBehaviour
     // 最初の手札・場札を配る
     void DealInitialCards()
     {
-        // 8枚を「場（Field）」に配る
-        for (int i = 0; i < 8; i++)
-        {
-            // 場札は表向き(true)
-            transferCard(fieldParent, true, i);
-        }
+        // 場札を配る
+        for (int i = 0; i < 8; i++) transferCard(fieldParent, true, i);
+
+        // プレイヤーの手札を配る
+        for (int i = 0; i < 8; i++) transferCard(playerHandParent, true, i);
+
+        // 相手の手札を配る（裏向き）
+        for (int i = 0; i < 8; i++) transferCard(enemyHandParent, false, i);
     }
 
     // 山札から指定の場所にカードを物理的に移動させる
@@ -106,22 +108,45 @@ public class GameManager : MonoBehaviour
         // 表裏をセット
         card.SetFaceUp(isFaceUp);
 
-        // --- 横4・縦2の座標計算 ---
-        float xSpacing = 1.2f; // 横の間隔
-        float ySpacing = 1.2f; // 縦の間隔
+        if (targetParent == playerHandParent || targetParent == enemyHandParent)
+        {
+            // 【手札：扇形に並べる】
+            bool isEnemy = (targetParent == enemyHandParent);
 
-        // 列 (0, 1, 2, 3) を計算
-        int column = index % 4;
-        // 行 (0 = 上段, 1 = 下段) を計算
-        int row = index / 4;
+            float radius = 12.0f;     // 円の半径
+            float angleStep = 5.0f;   // カード間の角度
 
-        // 中央揃えにするために 1.5f を引く (0.5, 1.5... の位置調整)
-        float x = (column - 1.5f) * xSpacing;
+            // プレイヤーは90度（真上）、敵は270度（真下）を基準にする
+            float baseAngle = isEnemy ? 270.0f : 90.0f;
 
-        // rowが0なら上(ySpacing/2)、1なら下(-ySpacing/2)
-        // さらに全体を少し上に上げるなら +1.0f などを足す
-        float y = (row == 0 ? (ySpacing / 2f) : -(ySpacing / 2f)) ;
+            // 敵の場合は並び順を反転させる
+            float currentAngle = baseAngle + (index - 3.5f) * angleStep * (isEnemy ? 1 : -1);
+            float rad = currentAngle * Mathf.Deg2Rad;
 
-        card.transform.localPosition = new Vector3(x, y, -0.01f * index);
+            float x = Mathf.Cos(rad) * radius;
+            // 敵は半径分「上」へ、プレイヤーは「下」へオフセット
+            float y = (Mathf.Sin(rad) * radius) + (isEnemy ? radius : -radius);
+
+            card.transform.localPosition = new Vector3(x, y, -0.01f * index);
+
+            // 回転：敵なら下を向くように調整
+            float rotationOffset = isEnemy ? 270.0f : 90.0f;
+            card.transform.localRotation = Quaternion.Euler(0, 0, currentAngle - rotationOffset);
+        }
+        else
+        {
+            // 【場札：4x2のグリッド配置】
+            float xSpacing = 1.2f;
+            float ySpacing = 1.2f;
+
+            int column = index % 4;
+            int row = index / 4;
+
+            float x = (column - 1.5f) * xSpacing;
+            float y = (row == 0 ? (ySpacing / 2f) : -(ySpacing / 2f));
+
+            card.transform.localPosition = new Vector3(x, y, -0.01f * index);
+            card.transform.localRotation = Quaternion.identity;
+        }
     }
 }
