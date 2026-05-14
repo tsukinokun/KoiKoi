@@ -27,6 +27,9 @@ public class GameManager : MonoBehaviour
     // これが「山札」の実体です
     private List<Card> _deck = new List<Card>();
 
+    // 現在選択されているカードの参照
+    private Card _currentSelectedCard;
+
     void Start()
     {
         // JSONを読み込み、48枚を生成して山札に入れる
@@ -167,5 +170,20 @@ public class GameManager : MonoBehaviour
     {
         return t == pHikariParent || t == pTaneParent || t == pTanParent || t == pKasuParent ||
                t == eHikariParent || t == eTaneParent || t == eTanParent || t == eKasuParent;
+    }
+
+    public void OnCardSelected(Card clickedCard)
+    {
+        // 1既に選ばれているポインタがあれば、そのオブジェクトの選択表示を消す
+        if (_currentSelectedCard != null)
+        {
+            _currentSelectedCard.SetSelected(false);
+        }
+
+        // 新しくクリックされたカードのポインタを上書きする
+        _currentSelectedCard = clickedCard;
+
+        // そのオブジェクトに「選ばれたぞ」と通知して見た目を変えさせる
+        _currentSelectedCard.SetSelected(true);
     }
 }

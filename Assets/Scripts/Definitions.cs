@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-// --- 1. カード自体のデータ構造 ---
+// カード自体のデータ構造
 [Serializable]
 public class CardData
 {
@@ -17,7 +17,7 @@ public class CardList
     public List<CardData> cards;
 }
 
-// --- 2. 役（ヤク）のデータ構造 ---
+// ヤクのデータ構造 ---
 [Serializable]
 public class YakuData
 {
