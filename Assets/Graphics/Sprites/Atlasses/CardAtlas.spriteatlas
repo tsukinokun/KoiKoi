@@ -74,7 +74,7 @@ SpriteAtlas:
     - 7f9c4fcce7a15ee4a84b73bcb0afff36: 21300000
     - 78c8c1dcc19a27d4388a2a5412658583: 21300000
     - 9c9ba81d6af6cb2429ad37dc943fa265: 21300000
-    - 6df8eb5d9c736994caa8905d541d8a7a: -3598721235499264479
+    - 6df8eb5d9c736994caa8905d541d8a7a: 21300000
     - 8397a8bdfbd7a054490a5d2bb014888b: 21300000
     - 475cb62e81498744abbf53ad5f7c9423: 21300000
     - bbd3d46edeab6844cadacdeafb4dcb8c: 21300000
@@ -125,7 +125,7 @@ SpriteAtlas:
   - {fileID: 21300000, guid: 7f9c4fcce7a15ee4a84b73bcb0afff36, type: 3}
   - {fileID: 21300000, guid: 78c8c1dcc19a27d4388a2a5412658583, type: 3}
   - {fileID: 21300000, guid: 9c9ba81d6af6cb2429ad37dc943fa265, type: 3}
-  - {fileID: -3598721235499264479, guid: 6df8eb5d9c736994caa8905d541d8a7a, type: 3}
+  - {fileID: 21300000, guid: 6df8eb5d9c736994caa8905d541d8a7a, type: 3}
   - {fileID: 21300000, guid: 8397a8bdfbd7a054490a5d2bb014888b, type: 3}
   - {fileID: 21300000, guid: 475cb62e81498744abbf53ad5f7c9423, type: 3}
   - {fileID: 21300000, guid: bbd3d46edeab6844cadacdeafb4dcb8c, type: 3}
@@ -175,7 +175,7 @@ SpriteAtlas:
   - Card_08_03
   - Card_11_02
   - Card_11_04
-  - Card_Back_0
+  - Card_Back
   - Card_04_02
   - Card_06_01
   - Card_01_02
