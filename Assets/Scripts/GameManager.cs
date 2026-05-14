@@ -12,6 +12,18 @@ public class GameManager : MonoBehaviour
     public Transform enemyHandParent;  // 相手手札の親
     public Transform fieldParent;      // 場札の親
 
+    [Header("Player Captured Areas")]
+    public Transform pHikariParent;
+    public Transform pTaneParent;
+    public Transform pTanParent;
+    public Transform pKasuParent;
+
+    [Header("Enemy Captured Areas")]
+    public Transform eHikariParent;
+    public Transform eTaneParent;
+    public Transform eTanParent;
+    public Transform eKasuParent;
+
     // これが「山札」の実体です
     private List<Card> _deck = new List<Card>();
 
@@ -148,5 +160,12 @@ public class GameManager : MonoBehaviour
             card.transform.localPosition = new Vector3(x, y, -0.01f * index);
             card.transform.localRotation = Quaternion.identity;
         }
+    }
+
+    // 獲得札エリアかどうかを判定する補助関数
+    bool IsCapturedArea(Transform t)
+    {
+        return t == pHikariParent || t == pTaneParent || t == pTanParent || t == pKasuParent ||
+               t == eHikariParent || t == eTaneParent || t == eTanParent || t == eKasuParent;
     }
 }
