@@ -1,10 +1,20 @@
-﻿using UnityEngine;
-using UnityEngine.U2D;
+﻿using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using UnityEngine;
+using UnityEngine.U2D;
+
+public enum TurnState
+{
+    PlayerTurn,
+    NPCTurn,
+    CheckingMatch
+}
 
 public class GameManager : MonoBehaviour
 {
+    private TurnState _currentState = TurnState.PlayerTurn;
+
     public SpriteAtlas cardAtlas;
     public GameObject cardPrefab;
 
@@ -174,16 +184,158 @@ public class GameManager : MonoBehaviour
 
     public void OnCardSelected(Card clickedCard)
     {
-        // 1既に選ばれているポインタがあれば、そのオブジェクトの選択表示を消す
-        if (_currentSelectedCard != null)
+        // プレイヤーのターン以外は一切のクリックを無視（ガード）
+        if (_currentState != TurnState.PlayerTurn) return;
+
+        Transform currentParent = clickedCard.transform.parent;
+
+        // 【フェーズ1: 自分の手札をクリックした時】
+        if (currentParent == playerHandParent)
         {
-            _currentSelectedCard.SetSelected(false);
+            // すでに選択されている手札があれば選択を解除
+            if (_currentSelectedCard != null)
+            {
+                _currentSelectedCard.SetSelected(false);
+            }
+
+            // 新しく手札を選択
+            _currentSelectedCard = clickedCard;
+            _currentSelectedCard.SetSelected(true);
+            Debug.Log($"手札を選択しました: {_currentSelectedCard.Data.month}月 ({_currentSelectedCard.Data.type})");
+        }
+        // 【フェーズ2: 手札を選択した状態で、場札をクリックした時】
+        else if (currentParent == fieldParent && _currentSelectedCard != null)
+        {
+            // 月（Data.month）が一致するかチェック
+            if (_currentSelectedCard.Data.month == clickedCard.Data.month)
+            {
+                Debug.Log($"【獲得一致】{_currentSelectedCard.Data.month}月が一致しました！");
+
+                // 一致したペアの獲得処理へ
+                CollectPair(_currentSelectedCard, clickedCard, true);
+
+                // 選択ポインタをクリア
+                _currentSelectedCard = null;
+
+                // 本来はこの後「山札から1枚めくるフェーズ」に入りますが、
+                // まずはターンが交互に進むかテストするため、NPCターンへ切り替えます
+                _currentState = TurnState.NPCTurn;
+                StartCoroutine(NPCTurnRoutine());
+            }
+            else
+            {
+                Debug.LogWarning("月の違う札です。合わせられません。");
+            }
+        }
+    }
+
+    // ペアの獲得処理 (isPlayer: プレイヤーかNPCか)
+    void CollectPair(Card handCard, Card fieldCard, bool isPlayer)
+    {
+        // 1. 手札だった札を獲得エリアへ
+        MoveToCapturedArea(handCard, isPlayer);
+
+        // 2. 場にあった札を獲得エリアへ
+        MoveToCapturedArea(fieldCard, isPlayer);
+    }
+
+    // 1枚のカードをタイプに応じた獲得エリアに移動させる
+    void MoveToCapturedArea(Card card, bool isPlayer)
+    {
+        // 選択状態の見た目を完全に初期化
+        card.SetSelected(false);
+        card.SetFaceUp(true); // 獲得札は常に表向き
+
+        // 飛ばし先の親トランスフォームを決定する
+        Transform targetParent = null;
+
+        // 文字列のブレを考慮して小文字で判定
+        string cardType = card.Data.type.ToLower();
+
+        if (isPlayer)
+        {
+            if (cardType == "hikari") targetParent = pHikariParent;
+            else if (cardType == "tane") targetParent = pTaneParent;
+            else if (cardType == "tan") targetParent = pTanParent;
+            else targetParent = pKasuParent;
+        }
+        else
+        {
+            if (cardType == "hikari") targetParent = eHikariParent;
+            else if (cardType == "tane") targetParent = eTaneParent;
+            else if (cardType == "tan") targetParent = eTanParent;
+            else targetParent = eKasuParent;
         }
 
-        // 新しくクリックされたカードのポインタを上書きする
-        _currentSelectedCard = clickedCard;
+        // 親を付け替える
+        card.transform.SetParent(targetParent);
 
-        // そのオブジェクトに「選ばれたぞ」と通知して見た目を変えさせる
-        _currentSelectedCard.SetSelected(true);
+        // 獲得エリア内での整列（簡易的にランダムに少しずらして重ねる、またはきれいに並べる）
+        // ここでは一旦、親の中心 (0,0,0) にリセットします（後ほどUIに合わせて調整してください）
+        int childCount = targetParent.childCount;
+        card.transform.localPosition = new Vector3(childCount * 0.2f, 0, -0.01f * childCount);
+        card.transform.localRotation = Quaternion.identity;
+    }
+
+    private IEnumerator NPCTurnRoutine()
+    {
+        Debug.Log("NPCが考えています...");
+        yield return new WaitForSeconds(1.5f); // 1.5秒待って人間らしさを演出
+
+        Card npcChoice = null;
+        Card fieldChoice = null;
+
+        // NPCの手札を1枚ずつ走査
+        foreach (Transform npcCardTr in enemyHandParent)
+        {
+            Card npcCard = npcCardTr.GetComponent<Card>();
+
+            // 場札を1枚ずつ走査
+            foreach (Transform fieldCardTr in fieldParent)
+            {
+                Card fieldCard = fieldCardTr.GetComponent<Card>();
+
+                // 月が一致するペアが見つかったら即決定
+                if (npcCard.Data.month == fieldCard.Data.month)
+                {
+                    npcChoice = npcCard;
+                    fieldChoice = fieldCard;
+                    break;
+                }
+            }
+            if (npcChoice != null) break;
+        }
+
+        // ペアが見つかった場合
+        if (npcChoice != null && fieldChoice != null)
+        {
+            Debug.Log($"【NPC獲得】{npcChoice.Data.month}月が一致しました。");
+            CollectPair(npcChoice, fieldChoice, false);
+        }
+        else
+        {
+            // 一致するものがなければ、NPCの手札の1枚目（インデックス0）を場に捨てる
+            if (enemyHandParent.childCount > 0)
+            {
+                Card discard = enemyHandParent.GetChild(0).GetComponent<Card>();
+                Debug.Log($"NPCは一致する札がないため、{discard.Data.month}月を場に捨てました。");
+
+                // 場札の親へ移動
+                discard.transform.SetParent(fieldParent);
+                discard.SetFaceUp(true);
+
+                // 場札の再整列ロジックが必要ですが、まずは末尾に配置
+                int fieldCount = fieldParent.childCount;
+                // DealInitialCardsの場札配置ロジックを流用すると綺麗ですが、一旦簡易配置
+                discard.transform.localPosition = new Vector3((fieldCount % 4 - 1.5f) * 1.2f, (fieldCount / 4 == 0 ? 0.6f : -0.6f), -0.01f * fieldCount);
+                discard.transform.localRotation = Quaternion.identity;
+            }
+        }
+
+        yield return new WaitForSeconds(1.0f);
+
+        // プレイヤーにターンを戻す
+        _currentState = TurnState.PlayerTurn;
+        Debug.Log("あなたのターンです。");
     }
 }
