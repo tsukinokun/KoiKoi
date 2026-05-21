@@ -110,12 +110,40 @@ public class GameManager : MonoBehaviour
     {
         // 場札を配る
         for (int i = 0; i < 8; i++) transferCard(fieldParent, true, i);
+        // ★ここで配り終わった場札を綺麗に並べる
+        RearrangeFieldCards();
 
         // プレイヤーの手札を配る
         for (int i = 0; i < 8; i++) transferCard(playerHandParent, true, i);
 
         // 相手の手札を配る（裏向き）
         for (int i = 0; i < 8; i++) transferCard(enemyHandParent, false, i);
+    }
+
+    // 場札を現在の枚数に応じてグリッド状にきれいに並べ直す関数
+    void RearrangeFieldCards()
+    {
+        float xSpacing = 1.2f;
+        float ySpacing = 1.2f;
+
+        int index = 0;
+        foreach (Transform child in fieldParent)
+        {
+            Card card = child.GetComponent<Card>();
+            if (card == null) continue;
+
+            int column = index % 4;
+            int row = index / 4;
+
+            float x = (column - 1.5f) * xSpacing;
+            float y = (row == 0 ? (ySpacing / 2f) : -(ySpacing / 2f));
+
+            // Z軸は重なり順がおかしくならないようにindexで少しずつ手前に出す
+            card.transform.localPosition = new Vector3(x, y, -0.01f * index);
+            card.transform.localRotation = Quaternion.identity;
+
+            index++;
+        }
     }
 
     // 山札から指定の場所にカードを物理的に移動させる
@@ -160,17 +188,9 @@ public class GameManager : MonoBehaviour
         }
         else
         {
-            // 【場札：4x2のグリッド配置】
-            float xSpacing = 1.2f;
-            float ySpacing = 1.2f;
-
-            int column = index % 4;
-            int row = index / 4;
-
-            float x = (column - 1.5f) * xSpacing;
-            float y = (row == 0 ? (ySpacing / 2f) : -(ySpacing / 2f));
-
-            card.transform.localPosition = new Vector3(x, y, -0.01f * index);
+            // ここでは親の付け替えと表裏のセットだけ行い、
+            // 座標リセットは配り終わった後の RearrangeFieldCards に任せる
+            card.transform.localPosition = Vector3.zero;
             card.transform.localRotation = Quaternion.identity;
         }
     }
@@ -184,15 +204,46 @@ public class GameManager : MonoBehaviour
 
     public void OnCardSelected(Card clickedCard)
     {
-        // プレイヤーのターン以外は一切のクリックを無視（ガード）
+        // ガード1: 引数のカード自体がヌルなら処理しない
+        if (clickedCard == null) return;
+
+        // ガード2: プレイヤーのターン以外は一切のクリックを無視
         if (_currentState != TurnState.PlayerTurn) return;
+
+        // ガード3: カードのデータがバインドされていなければ処理しない
+        if (clickedCard.Data == null)
+        {
+            Debug.LogError($"クリックされたカード {clickedCard.name} のDataが割り当てられていません！");
+            return;
+        }
 
         Transform currentParent = clickedCard.transform.parent;
 
         // 【フェーズ1: 自分の手札をクリックした時】
         if (currentParent == playerHandParent)
         {
-            // すでに選択されている手札があれば選択を解除
+            // ★【変更】すでにこのカードが選択されている状態でもう一度クリックされた場合（ダブルクリック扱い）
+            if (_currentSelectedCard == clickedCard)
+            {
+                Debug.Log($"手札の再クリックを検知: {clickedCard.Data.month}月を場に捨てます。");
+
+                // 選択ポインタをクリア
+                _currentSelectedCard = null;
+
+                // カードの選択状態を解除して場に移動
+                clickedCard.SetSelected(false);
+                clickedCard.transform.SetParent(fieldParent);
+                clickedCard.SetFaceUp(true); // 表を向ける
+
+                // 場札を綺麗に並び替える
+                RearrangeFieldCards();
+
+                // 自分の山札めくりフェーズへ移行
+                StartCoroutine(DrawFromDeckRoutine(true));
+                return;
+            }
+
+            // 別の手札が選択されていたら古い方の選択を解除
             if (_currentSelectedCard != null)
             {
                 _currentSelectedCard.SetSelected(false);
@@ -206,26 +257,115 @@ public class GameManager : MonoBehaviour
         // 【フェーズ2: 手札を選択した状態で、場札をクリックした時】
         else if (currentParent == fieldParent && _currentSelectedCard != null)
         {
-            // 月（Data.month）が一致するかチェック
+            // 安全のため、選択中の手札のデータもヌルチェック
+            if (_currentSelectedCard.Data == null)
+            {
+                _currentSelectedCard.SetSelected(false);
+                _currentSelectedCard = null;
+                return;
+            }
+
+            // 月が一致するかチェック
             if (_currentSelectedCard.Data.month == clickedCard.Data.month)
             {
-                Debug.Log($"【獲得一致】{_currentSelectedCard.Data.month}月が一致しました！");
+                Debug.Log($"【手札獲得一致】{_currentSelectedCard.Data.month}月が一致しました！");
 
-                // 一致したペアの獲得処理へ
-                CollectPair(_currentSelectedCard, clickedCard, true);
+                // ローカル変数に退避させてからクリア
+                Card hand = _currentSelectedCard;
+                Card field = clickedCard;
 
-                // 選択ポインタをクリア
                 _currentSelectedCard = null;
 
-                // 本来はこの後「山札から1枚めくるフェーズ」に入りますが、
-                // まずはターンが交互に進むかテストするため、NPCターンへ切り替えます
-                _currentState = TurnState.NPCTurn;
-                StartCoroutine(NPCTurnRoutine());
+                CollectPair(hand, field, true);
+
+                // 山札めくりフェーズへ移行
+                StartCoroutine(DrawFromDeckRoutine(true));
             }
             else
             {
                 Debug.LogWarning("月の違う札です。合わせられません。");
             }
+        }
+    }
+
+    private IEnumerator DrawFromDeckRoutine(bool isPlayer)
+    {
+        // 状態を CheckingMatch にして、一時的にユーザーの入力をブロック
+        _currentState = TurnState.CheckingMatch;
+
+        yield return new WaitForSeconds(0.8f); // 前のアクションからの余韻
+
+        if (_deck.Count == 0)
+        {
+            Debug.LogWarning("山札が空になりました。");
+            // 本来はここでゲーム終了・集計ですが、一旦次のターンへ
+            SetNextTurn(isPlayer);
+            yield break;
+        }
+
+        // 山札の末尾（一番上）から1枚めくるポインタを取得
+        Card drawnCard = _deck[_deck.Count - 1];
+        _deck.RemoveAt(_deck.Count - 1);
+
+        // 一旦場札の領域に仮移動させて表を向ける（「山札からめくった」視覚表現）
+        drawnCard.transform.SetParent(fieldParent);
+        drawnCard.SetFaceUp(true);
+        Debug.Log($"山札からめくった札: {drawnCard.Data.month}月 ({drawnCard.Data.type})");
+
+        // めくった札が場札と一致するかチェック
+        Card matchedFieldCard = null;
+        foreach (Transform fieldCardTr in fieldParent)
+        {
+            Card fieldCard = fieldCardTr.GetComponent<Card>();
+            // 自分自身（たった今仮配置したdrawnCard）は除外して比較
+            if (fieldCard != null && fieldCard != drawnCard)
+            {
+                if (drawnCard.Data.month == fieldCard.Data.month)
+                {
+                    matchedFieldCard = fieldCard;
+                    break;
+                }
+            }
+        }
+
+        yield return new WaitForSeconds(1.0f); // めくったカードをプレイヤーに確認させる時間
+
+        if (matchedFieldCard != null)
+        {
+            Debug.Log($"【山札めくり一致】{drawnCard.Data.month}月が場札と一致！獲得します。");
+            // めくった札と場札のペアを獲得エリアへ
+            CollectPair(drawnCard, matchedFieldCard, isPlayer);
+        }
+        else
+        {
+            Debug.Log($"【山札めくり不一致】一致する月がないため、場札に加えます。");
+            // 一致しなかったらそのまま場札の仲間入り
+            // （すでに親は fieldParent になっているので並び替えるだけでOK）
+        }
+
+        // 場札を綺麗に並び替える
+        RearrangeFieldCards();
+
+        yield return new WaitForSeconds(0.8f);
+
+        // 次のターンへ移行
+        SetNextTurn(isPlayer);
+    }
+
+    // ターンを交代する補助関数
+    void SetNextTurn(bool currentIsPlayer)
+    {
+        if (currentIsPlayer)
+        {
+            // プレイヤーが引き終わったのでNPCのターンへ
+            _currentState = TurnState.NPCTurn;
+            StartCoroutine(NPCTurnRoutine());
+        }
+        else
+        {
+            // NPCが引き終わったのでプレイヤーのターンへ
+            _currentState = TurnState.PlayerTurn;
+            Debug.Log("あなたのターンです。");
         }
     }
 
@@ -280,22 +420,17 @@ public class GameManager : MonoBehaviour
     private IEnumerator NPCTurnRoutine()
     {
         Debug.Log("NPCが考えています...");
-        yield return new WaitForSeconds(1.5f); // 1.5秒待って人間らしさを演出
+        yield return new WaitForSeconds(1.5f);
 
         Card npcChoice = null;
         Card fieldChoice = null;
 
-        // NPCの手札を1枚ずつ走査
         foreach (Transform npcCardTr in enemyHandParent)
         {
             Card npcCard = npcCardTr.GetComponent<Card>();
-
-            // 場札を1枚ずつ走査
             foreach (Transform fieldCardTr in fieldParent)
             {
                 Card fieldCard = fieldCardTr.GetComponent<Card>();
-
-                // 月が一致するペアが見つかったら即決定
                 if (npcCard.Data.month == fieldCard.Data.month)
                 {
                     npcChoice = npcCard;
@@ -306,7 +441,6 @@ public class GameManager : MonoBehaviour
             if (npcChoice != null) break;
         }
 
-        // ペアが見つかった場合
         if (npcChoice != null && fieldChoice != null)
         {
             Debug.Log($"【NPC獲得】{npcChoice.Data.month}月が一致しました。");
@@ -314,28 +448,17 @@ public class GameManager : MonoBehaviour
         }
         else
         {
-            // 一致するものがなければ、NPCの手札の1枚目（インデックス0）を場に捨てる
             if (enemyHandParent.childCount > 0)
             {
                 Card discard = enemyHandParent.GetChild(0).GetComponent<Card>();
                 Debug.Log($"NPCは一致する札がないため、{discard.Data.month}月を場に捨てました。");
-
-                // 場札の親へ移動
                 discard.transform.SetParent(fieldParent);
                 discard.SetFaceUp(true);
-
-                // 場札の再整列ロジックが必要ですが、まずは末尾に配置
-                int fieldCount = fieldParent.childCount;
-                // DealInitialCardsの場札配置ロジックを流用すると綺麗ですが、一旦簡易配置
-                discard.transform.localPosition = new Vector3((fieldCount % 4 - 1.5f) * 1.2f, (fieldCount / 4 == 0 ? 0.6f : -0.6f), -0.01f * fieldCount);
-                discard.transform.localRotation = Quaternion.identity;
+                RearrangeFieldCards();
             }
         }
 
-        yield return new WaitForSeconds(1.0f);
-
-        // プレイヤーにターンを戻す
-        _currentState = TurnState.PlayerTurn;
-        Debug.Log("あなたのターンです。");
+        // 【変更】ここで即プレイヤーに返さず、NPCの山札めくりフェーズへ進む
+        StartCoroutine(DrawFromDeckRoutine(false));
     }
 }
