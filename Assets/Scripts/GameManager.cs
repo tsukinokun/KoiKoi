@@ -124,7 +124,14 @@ public class GameManager : MonoBehaviour
     void RearrangeFieldCards()
     {
         float xSpacing = 1.2f;
-        float ySpacing = 1.2f;
+        float ySpacing = 1.5f; // 行間を少し広げて見やすく調整
+
+        // 場札の総数に応じて、1行あたりの列数を動的に決める（最低4列、枚数が増えたら5列、6列と横に広げる）
+        int childCount = fieldParent.childCount;
+        int maxColumns = 4;
+        if (childCount > 8) maxColumns = Mathf.CeilToInt(childCount / 2f); // 2行を維持して横に広げる場合
+
+        // もし横幅を広げず、3行、4行と下に伸ばしたい場合は maxColumns = 4 のままでOKです。
 
         int index = 0;
         foreach (Transform child in fieldParent)
@@ -132,14 +139,17 @@ public class GameManager : MonoBehaviour
             Card card = child.GetComponent<Card>();
             if (card == null) continue;
 
-            int column = index % 4;
-            int row = index / 4;
+            // 動的に計算された列数ベースで位置を決める
+            int column = index % maxColumns;
+            int row = index / maxColumns;
 
-            float x = (column - 1.5f) * xSpacing;
-            float y = (row == 0 ? (ySpacing / 2f) : -(ySpacing / 2f));
+            // 中央揃えにするためのオフセット計算
+            float x = (column - (maxColumns - 1) / 2f) * xSpacing;
+            float y = -(row * ySpacing) + (ySpacing / 2f); // 行（row）が増えても正しく下にズレるように修正
 
-            // Z軸は重なり順がおかしくならないようにindexで少しずつ手前に出す
-            card.transform.localPosition = new Vector3(x, y, -0.01f * index);
+            // ★重要★ Unityの2D描画順を保つため、インデックスが大きい（後から来た）札ほど
+            // Z軸を手前（カメラ側、つまりマイナス方向）に出す
+            card.transform.localPosition = new Vector3(x, y, -0.05f * index);
             card.transform.localRotation = Quaternion.identity;
 
             index++;
