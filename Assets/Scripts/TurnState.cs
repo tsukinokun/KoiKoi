@@ -5,5 +5,6 @@ public enum TurnState
 {
     PlayerTurn,
     NPCTurn,
-    CheckingMatch
+    CheckingMatch,
+    ChoosingKoiKoi
 }
