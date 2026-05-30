@@ -476,14 +476,8 @@ MonoBehaviour:
   playerHandView: {fileID: 1755735234}
   enemyHandView: {fileID: 1360908144}
   fieldView: {fileID: 2052844031}
-  pHikariParent: {fileID: 1173709255}
-  pTaneParent: {fileID: 791969109}
-  pTanParent: {fileID: 1840815727}
-  pKasuParent: {fileID: 1569678518}
-  eHikariParent: {fileID: 113083079}
-  eTaneParent: {fileID: 948918334}
-  eTanParent: {fileID: 741574285}
-  eKasuParent: {fileID: 1498433340}
+  playerCapturedView: {fileID: 2106197767}
+  enemyCapturedView: {fileID: 562295284}
   yakuWindowManager: {fileID: 199974964}
 --- !u!4 &352264725
 Transform:
@@ -588,6 +582,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 562295283}
+  - component: {fileID: 562295284}
   m_Layer: 0
   m_Name: EnemyCaptured
   m_TagString: Untagged
@@ -614,6 +609,23 @@ Transform:
   - {fileID: 1498433340}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &562295284
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 562295282}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 532cb9949e34d0a49bf2039000b9274e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CapturedAreaView
+  hikariParent: {fileID: 113083079}
+  taneParent: {fileID: 948918334}
+  tanParent: {fileID: 741574285}
+  kasuParent: {fileID: 1498433340}
+  xSpacing: 0.2
 --- !u!1001 &728643843
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -1474,6 +1486,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 2106197766}
+  - component: {fileID: 2106197767}
   m_Layer: 0
   m_Name: PlayerCaptured
   m_TagString: Untagged
@@ -1500,6 +1513,23 @@ Transform:
   - {fileID: 1569678518}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &2106197767
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2106197765}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 532cb9949e34d0a49bf2039000b9274e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CapturedAreaView
+  hikariParent: {fileID: 1173709255}
+  taneParent: {fileID: 791969109}
+  tanParent: {fileID: 1840815727}
+  kasuParent: {fileID: 1569678518}
+  xSpacing: 0.2
 --- !u!1 &2126090965
 GameObject:
   m_ObjectHideFlags: 0

@@ -1,10 +1,9 @@
-﻿using NUnit.Framework.Interfaces;
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using UnityEngine;
 using UnityEngine.U2D;
+using System.Linq;
 
 public class GameManager : MonoBehaviour
 {
@@ -13,22 +12,14 @@ public class GameManager : MonoBehaviour
     public SpriteAtlas cardAtlas;
     public GameObject cardPrefab;
 
-    [Header("Hand Views")]
-    public HandView playerHandView;    // 🌟プレイヤー手札の管理ビュー
-    public HandView enemyHandView;     // 🌟相手手札の管理ビュー
-    public FieldView fieldView;        // 場札を管理するビューコンポーネント
+    [Header("Hand & Field Views")]
+    public HandView playerHandView;       // プレイヤー手札の管理ビュー
+    public HandView enemyHandView;        // 相手手札の管理ビュー
+    public FieldView fieldView;           // 場札の管理ビュー
 
-    [Header("Player Captured Areas")]
-    public Transform pHikariParent;
-    public Transform pTaneParent;
-    public Transform pTanParent;
-    public Transform pKasuParent;
-
-    [Header("Enemy Captured Areas")]
-    public Transform eHikariParent;
-    public Transform eTaneParent;
-    public Transform eTanParent;
-    public Transform eKasuParent;
+    [Header("Captured Area Views")]
+    public CapturedAreaView playerCapturedView; // 🌟プレイヤー獲得札の管理ビュー
+    public CapturedAreaView enemyCapturedView;  // 🌟相手獲得札の管理ビュー
 
     // これが「山札」の実体です
     private List<Card> _deck = new List<Card>();
@@ -116,7 +107,7 @@ public class GameManager : MonoBehaviour
         for (int i = 0; i < 8; i++) DistributeHandCard(enemyHandView, false);
     }
 
-    // 🌟山札から1枚引いて手札に追加する抽象化されたメソッド
+    // 山札から1枚引いて手札に追加する抽象化されたメソッド
     void DistributeHandCard(HandView targetHand, bool isFaceUp)
     {
         if (_deck.Count == 0 || targetHand == null) return;
@@ -127,7 +118,7 @@ public class GameManager : MonoBehaviour
         targetHand.AddCard(card, isFaceUp);
     }
 
-    // 🌟山札から1枚引いて場札に追加する抽象化されたメソッド
+    // 山札から1枚引いて場札に追加する抽象化されたメソッド
     void DistributeFieldCard(bool isFaceUp)
     {
         if (_deck.Count == 0 || fieldView == null) return;
@@ -136,13 +127,6 @@ public class GameManager : MonoBehaviour
         _deck.RemoveAt(_deck.Count - 1);
 
         fieldView.AddCard(card, isFaceUp);
-    }
-
-    // 獲得札エリアかどうかを判定する補助関数
-    bool IsCapturedArea(Transform t)
-    {
-        return t == pHikariParent || t == pTaneParent || t == pTanParent || t == pKasuParent ||
-               t == eHikariParent || t == eTaneParent || t == eTanParent || t == eKasuParent;
     }
 
     public void OnCardSelected(Card clickedCard)
@@ -174,7 +158,7 @@ public class GameManager : MonoBehaviour
                     fieldView.AddCard(clickedCard, true);
                 }
 
-                // 🌟手札からカードが1枚減ったので、手札の扇形をきれいに詰め直す
+                // 手札からカードが1枚減ったので、手札の扇形をきれいに詰め直す
                 playerHandView.Rearrange();
 
                 // 自分の山札めくりフェーズへ移行
@@ -215,7 +199,7 @@ public class GameManager : MonoBehaviour
                 // 獲得処理と役確認が終わった後に、山札めくりフェーズを実行
                 CollectPair(hand, field, true, () =>
                 {
-                    // 🌟獲得されて手札から無くなったため、扇形をきれいに詰め直す
+                    // 獲得されて手札から無くなったため、扇形をきれいに詰め直す
                     if (playerHandView != null) playerHandView.Rearrange();
 
                     StartCoroutine(DrawFromDeckRoutine(true));
@@ -318,7 +302,7 @@ public class GameManager : MonoBehaviour
     // ペアの獲得処理
     void CollectPair(Card handCard, Card fieldCard, bool isPlayer, System.Action onComplete)
     {
-        // 1. 獲得エリアへ移動
+        // 1. 獲得エリアへ移動（🌟専用Viewにお任せ）
         MoveToCapturedArea(handCard, isPlayer);
         MoveToCapturedArea(fieldCard, isPlayer);
 
@@ -350,29 +334,21 @@ public class GameManager : MonoBehaviour
         card.SetSelected(false);
         card.SetFaceUp(true);
 
-        Transform targetParent = null;
-        string cardType = card.Data.type.ToLower();
-
+        // 🌟プレイヤーと敵で、それぞれに対応したCapturedAreaViewに処理を丸投げする
         if (isPlayer)
         {
-            if (cardType == "hikari") targetParent = pHikariParent;
-            else if (cardType == "tane") targetParent = pTaneParent;
-            else if (cardType == "tan" || cardType == "tanzaku") targetParent = pTanParent;
-            else targetParent = pKasuParent;
+            if (playerCapturedView != null)
+            {
+                playerCapturedView.AddCard(card, card.Data.type);
+            }
         }
         else
         {
-            if (cardType == "hikari") targetParent = eHikariParent;
-            else if (cardType == "tane") targetParent = eTaneParent;
-            else if (cardType == "tan" || cardType == "tanzaku") targetParent = eTanParent;
-            else targetParent = eKasuParent;
+            if (enemyCapturedView != null)
+            {
+                enemyCapturedView.AddCard(card, card.Data.type);
+            }
         }
-
-        card.transform.SetParent(targetParent);
-
-        int childCount = targetParent.childCount;
-        card.transform.localPosition = new Vector3(childCount * 0.2f, 0, -0.01f * childCount);
-        card.transform.localRotation = Quaternion.identity;
     }
 
     private IEnumerator NPCTurnRoutine()
@@ -408,7 +384,7 @@ public class GameManager : MonoBehaviour
 
             CollectPair(npcChoice, fieldChoice, false, () =>
             {
-                // 🌟獲得されて敵手札から無くなったため、敵手札の扇形を詰め直す
+                // 獲得されて敵手札から無くなったため、敵手札の扇形を詰め直す
                 if (enemyHandView != null) enemyHandView.Rearrange();
 
                 StartCoroutine(DrawFromDeckRoutine(false));
@@ -427,7 +403,7 @@ public class GameManager : MonoBehaviour
                     fieldView.AddCard(discard, true);
                 }
 
-                // 🌟捨てて手札から減ったため、敵手札の扇形を詰め直す
+                // 捨てて手札から減ったため、敵手札の扇形を詰め直す
                 enemyHandView.Rearrange();
             }
 
@@ -437,20 +413,22 @@ public class GameManager : MonoBehaviour
 
     private List<YakuResult> CheckAllYaku(bool isPlayer)
     {
+        // 🌟スキャン対象のViewコンポーネントを特定
+        CapturedAreaView targetView = isPlayer ? playerCapturedView : enemyCapturedView;
         List<CardData> capturedCards = new List<CardData>();
-        Transform[] targets = isPlayer
-            ? new Transform[] { pHikariParent, pTaneParent, pTanParent, pKasuParent }
-            : new Transform[] { eHikariParent, eTaneParent, eTanParent, eKasuParent };
 
-        foreach (var parent in targets)
+        if (targetView != null)
         {
-            if (parent == null) continue;
-            foreach (Transform child in parent)
+            // Viewオブジェクトの下にある、各カテゴリ親（光・種・短・カス）を走査する
+            foreach (Transform categoryParent in targetView.transform)
             {
-                Card card = child.GetComponent<Card>();
-                if (card != null && card.Data != null)
+                foreach (Transform child in categoryParent)
                 {
-                    capturedCards.Add(card.Data);
+                    Card card = child.GetComponent<Card>();
+                    if (card != null && card.Data != null)
+                    {
+                        capturedCards.Add(card.Data);
+                    }
                 }
             }
         }
