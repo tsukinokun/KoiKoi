@@ -21,7 +21,7 @@ public class GameManager : MonoBehaviour
 
     public Transform playerHandParent; // プレイヤー手札の親
     public Transform enemyHandParent;  // 相手手札の親
-    public Transform fieldParent;      // 場札の親
+    public FieldView fieldView;        // 🌟場札を管理するビューコンポーネント
 
     [Header("Player Captured Areas")]
     public Transform pHikariParent;
@@ -68,7 +68,6 @@ public class GameManager : MonoBehaviour
 
         Sprite backSprite = cardAtlas.GetSprite("Card_Back");
 
-        // あとはそのまま
         if (cardList == null || cardList.cards == null)
         {
             Debug.LogError("JSONのパースに失敗しました。形式を確認してください。");
@@ -113,99 +112,52 @@ public class GameManager : MonoBehaviour
     void DealInitialCards()
     {
         // 場札を配る
-        for (int i = 0; i < 8; i++) transferCard(fieldParent, true, i);
-        // ★ここで配り終わった場札を綺麗に並べる
-        RearrangeFieldCards();
+        for (int i = 0; i < 8; i++) transferCard(null, true, i, true);
 
         // プレイヤーの手札を配る
-        for (int i = 0; i < 8; i++) transferCard(playerHandParent, true, i);
+        for (int i = 0; i < 8; i++) transferCard(playerHandParent, true, i, false);
 
         // 相手の手札を配る（裏向き）
-        for (int i = 0; i < 8; i++) transferCard(enemyHandParent, false, i);
-    }
-
-    // 場札を現在の枚数に応じてグリッド状にきれいに並べ直す関数
-    void RearrangeFieldCards()
-    {
-        float xSpacing = 1.2f;
-        float ySpacing = 1.5f; // 行間を少し広げて見やすく調整
-
-        // 場札の総数に応じて、1行あたりの列数を動的に決める（最低4列、枚数が増えたら5列、6列と横に広げる）
-        int childCount = fieldParent.childCount;
-        int maxColumns = 4;
-        if (childCount > 8) maxColumns = Mathf.CeilToInt(childCount / 2f); // 2行を維持して横に広げる場合
-
-        // もし横幅を広げず、3行、4行と下に伸ばしたい場合は maxColumns = 4 のままでOKです。
-
-        int index = 0;
-        foreach (Transform child in fieldParent)
-        {
-            Card card = child.GetComponent<Card>();
-            if (card == null) continue;
-
-            // 動的に計算された列数ベースで位置を決める
-            int column = index % maxColumns;
-            int row = index / maxColumns;
-
-            // 中央揃えにするためのオフセット計算
-            float x = (column - (maxColumns - 1) / 2f) * xSpacing;
-            float y = -(row * ySpacing) + (ySpacing / 2f); // 行（row）が増えても正しく下にズレるように修正
-
-            // ★重要★ Unityの2D描画順を保つため、インデックスが大きい（後から来た）札ほど
-            // Z軸を手前（カメラ側、つまりマイナス方向）に出す
-            card.transform.localPosition = new Vector3(x, y, -0.05f * index);
-            card.transform.localRotation = Quaternion.identity;
-
-            index++;
-        }
+        for (int i = 0; i < 8; i++) transferCard(enemyHandParent, false, i, false);
     }
 
     // 山札から指定の場所にカードを物理的に移動させる
-    void transferCard(Transform targetParent, bool isFaceUp, int index)
+    void transferCard(Transform targetParent, bool isFaceUp, int index, bool isField)
     {
         if (_deck.Count == 0) return;
 
-        // リスト（山札）の最後から1枚取り出す
         Card card = _deck[_deck.Count - 1];
         _deck.RemoveAt(_deck.Count - 1);
 
-        // 親を指定の場所（FieldParentなど）に付け替える
-        card.transform.SetParent(targetParent);
+        // 🌟場札（isField）ならFieldViewにお任せする（内部で自動ソートされます）
+        if (isField)
+        {
+            if (fieldView != null)
+            {
+                fieldView.AddCard(card, isFaceUp);
+            }
+            return;
+        }
 
-        // 表裏をセット
+        // 親を指定の場所に付け替える（手札用）
+        card.transform.SetParent(targetParent);
         card.SetFaceUp(isFaceUp);
 
         if (targetParent == playerHandParent || targetParent == enemyHandParent)
         {
-            // 【手札：扇形に並べる】
+            // 【手札：扇形に並べる】処理
             bool isEnemy = (targetParent == enemyHandParent);
-
-            float radius = 12.0f;     // 円の半径
-            float angleStep = 5.0f;   // カード間の角度
-
-            // プレイヤーは90度（真上）、敵は270度（真下）を基準にする
+            float radius = 12.0f;
+            float angleStep = 5.0f;
             float baseAngle = isEnemy ? 270.0f : 90.0f;
-
-            // 敵の場合は並び順を反転させる
             float currentAngle = baseAngle + (index - 3.5f) * angleStep * (isEnemy ? 1 : -1);
             float rad = currentAngle * Mathf.Deg2Rad;
-
             float x = Mathf.Cos(rad) * radius;
-            // 敵は半径分「上」へ、プレイヤーは「下」へオフセット
             float y = (Mathf.Sin(rad) * radius) + (isEnemy ? radius : -radius);
 
             card.transform.localPosition = new Vector3(x, y, -0.01f * index);
-
-            // 回転：敵なら下を向くように調整
             float rotationOffset = isEnemy ? 270.0f : 90.0f;
             card.transform.localRotation = Quaternion.Euler(0, 0, currentAngle - rotationOffset);
-        }
-        else
-        {
-            // ここでは親の付け替えと表裏のセットだけ行い、
-            // 座標リセットは配り終わった後の RearrangeFieldCards に任せる
-            card.transform.localPosition = Vector3.zero;
-            card.transform.localRotation = Quaternion.identity;
         }
     }
 
@@ -218,13 +170,8 @@ public class GameManager : MonoBehaviour
 
     public void OnCardSelected(Card clickedCard)
     {
-        // ガード1: 引数のカード自体がヌルなら処理しない
         if (clickedCard == null) return;
-
-        // ガード2: プレイヤーのターン以外は一切のクリックを無視
         if (_currentState != TurnState.PlayerTurn) return;
-
-        // ガード3: カードのデータがバインドされていなければ処理しない
         if (clickedCard.Data == null)
         {
             Debug.LogError($"クリックされたカード {clickedCard.name} のDataが割り当てられていません！");
@@ -241,23 +188,20 @@ public class GameManager : MonoBehaviour
             {
                 Debug.Log($"手札の再クリックを検知: {clickedCard.Data.month}月を場に捨てます。");
 
-                // 選択ポインタをクリア
                 _currentSelectedCard = null;
-
-                // カードの選択状態を解除して場に移動
                 clickedCard.SetSelected(false);
-                clickedCard.transform.SetParent(fieldParent);
-                clickedCard.SetFaceUp(true); // 表を向ける
 
-                // 場札を綺麗に並び替える
-                RearrangeFieldCards();
+                // 🌟FieldViewにカードの追加と再整列を任せる
+                if (fieldView != null)
+                {
+                    fieldView.AddCard(clickedCard, true);
+                }
 
                 // 自分の山札めくりフェーズへ移行
                 StartCoroutine(DrawFromDeckRoutine(true));
                 return;
             }
 
-            // 別の手札が選択されていたら古い方の選択を解除
             if (_currentSelectedCard != null)
             {
                 _currentSelectedCard.SetSelected(false);
@@ -269,9 +213,8 @@ public class GameManager : MonoBehaviour
             Debug.Log($"手札を選択しました: {_currentSelectedCard.Data.month}月 ({_currentSelectedCard.Data.type})");
         }
         // 【フェーズ2: 手札を選択した状態で、場札をクリックした時】
-        else if (currentParent == fieldParent && _currentSelectedCard != null)
+        else if (fieldView != null && currentParent == fieldView.transform && _currentSelectedCard != null)
         {
-            // 安全のため、選択中の手札のデータもヌルチェック
             if (_currentSelectedCard.Data == null)
             {
                 _currentSelectedCard.SetSelected(false);
@@ -284,14 +227,14 @@ public class GameManager : MonoBehaviour
             {
                 Debug.Log($"【手札獲得一致】{_currentSelectedCard.Data.month}月が一致しました！");
 
-                // ローカル変数に退避させてからクリア
                 Card hand = _currentSelectedCard;
                 Card field = clickedCard;
 
                 _currentSelectedCard = null;
 
-                // 獲得処理と役確認が終わった後に、山札めくりフェーズ（DrawFromDeckRoutine）を実行する
-                CollectPair(hand, field, true, () => {
+                // 獲得処理と役確認が終わった後に、山札めくりフェーズを実行
+                CollectPair(hand, field, true, () =>
+                {
                     StartCoroutine(DrawFromDeckRoutine(true));
                 });
             }
@@ -318,53 +261,59 @@ public class GameManager : MonoBehaviour
         Card drawnCard = _deck[_deck.Count - 1];
         _deck.RemoveAt(_deck.Count - 1);
 
-        drawnCard.transform.SetParent(fieldParent);
-        drawnCard.SetFaceUp(true);
+        // 🌟山札からめくったカードをFieldViewに追加（自動整列される）
+        if (fieldView != null)
+        {
+            fieldView.AddCard(drawnCard, true);
+        }
         Debug.Log($"山札からめくった札: {drawnCard.Data.month}月 ({drawnCard.Data.type})");
 
         Card matchedFieldCard = null;
-        foreach (Transform fieldCardTr in fieldParent)
+        if (fieldView != null)
         {
-            Card fieldCard = fieldCardTr.GetComponent<Card>();
-            if (fieldCard != null && fieldCard != drawnCard)
+            foreach (Transform fieldCardTr in fieldView.transform)
             {
-                if (drawnCard.Data.month == fieldCard.Data.month)
+                Card fieldCard = fieldCardTr.GetComponent<Card>();
+                if (fieldCard != null && fieldCard != drawnCard)
                 {
-                    matchedFieldCard = fieldCard;
-                    break;
+                    if (drawnCard.Data.month == fieldCard.Data.month)
+                    {
+                        matchedFieldCard = fieldCard;
+                        break;
+                    }
                 }
             }
         }
 
         yield return new WaitForSeconds(1.0f);
 
-        // ★制御フラグ：山札めくり後の処理（獲得演出やUI閉じ待ち）が完了したか
         bool isDrawingProcessDone = false;
 
         if (matchedFieldCard != null)
         {
             Debug.Log($"【山札めくり一致】{drawnCard.Data.month}月が場札と一致！獲得します。");
 
-            // 獲得処理を呼び出し、役ウィンドウが閉じられたタイミングでフラグを true にする
-            CollectPair(drawnCard, matchedFieldCard, isPlayer, () => {
+            CollectPair(drawnCard, matchedFieldCard, isPlayer, () =>
+            {
                 isDrawingProcessDone = true;
             });
         }
         else
         {
             Debug.Log($"【山札めくり不一致】一致する月がないため、場札に加えます。");
-            isDrawingProcessDone = true; // 一致しなかった場合は即座に進行可能にする
+            isDrawingProcessDone = true;
         }
 
-        // ラムダ式内（ウィンドウを閉じるボタンが押されるなど）でフラグが立てられるまでコルーチンを待機
         yield return new WaitUntil(() => isDrawingProcessDone);
 
-        // 場札を綺麗に並び替える
-        RearrangeFieldCards();
+        // 🌟獲得されて減った、あるいは不一致で増えた場札を綺麗に並べ直す
+        if (fieldView != null)
+        {
+            fieldView.Rearrange();
+        }
 
         yield return new WaitForSeconds(0.8f);
 
-        // ➔ 山札から引き終わったため、ヒットの有無に関わらずここで確実に相手へのターン交代を行います
         SetNextTurn(isPlayer);
     }
 
@@ -373,47 +322,41 @@ public class GameManager : MonoBehaviour
     {
         if (currentIsPlayer)
         {
-            // プレイヤーが引き終わったのでNPCのターンへ
             _currentState = TurnState.NPCTurn;
             StartCoroutine(NPCTurnRoutine());
         }
         else
         {
-            // NPCが引き終わったのでプレイヤーのターンへ
             _currentState = TurnState.PlayerTurn;
             Debug.Log("あなたのターンです。");
         }
     }
 
-    // ペアの獲得処理 (isPlayer: プレイヤーかNPCか, onComplete: 演出や確認が全て終了した時に呼ぶコールバック)
+    // ペアの獲得処理
     void CollectPair(Card handCard, Card fieldCard, bool isPlayer, System.Action onComplete)
     {
-        // 1. 獲得エリアへ移動
+        // 獲得エリアへ移動
         MoveToCapturedArea(handCard, isPlayer);
         MoveToCapturedArea(fieldCard, isPlayer);
 
-        // 2. 成立したすべての役をリストで取得
+        // 成立したすべての役をリストで取得
         List<YakuResult> activeYakus = CheckAllYaku(isPlayer);
 
-        // 3. 役が1つ以上成立している場合の処理（現時点ではプレイヤー側のみUI表示）
+        // 役が1つ以上成立している場合の処理
         if (isPlayer && activeYakus.Count > 0 && yakuWindowManager != null)
         {
-            // UI表示中は一時的に操作をロック
             _currentState = TurnState.CheckingMatch;
 
-            // 複数の役名を「 ・ 」で結合
             string combinedName = string.Join(" ・ ", activeYakus.Select(y => y.Name));
-            // 点数の合計
             int totalPoints = activeYakus.Sum(y => y.Points);
 
-            // UIを表示し、プレイヤーがウィンドウを閉じたらコールバックを実行
-            yakuWindowManager.ShowYaku(combinedName, totalPoints, () => {
+            yakuWindowManager.ShowYaku(combinedName, totalPoints, () =>
+            {
                 onComplete?.Invoke();
             });
         }
         else
         {
-            // 役が成立していない、またはNPCの場合は、立ち止まらずに即次のステップへ
             onComplete?.Invoke();
         }
     }
@@ -421,14 +364,10 @@ public class GameManager : MonoBehaviour
     // 1枚のカードをタイプに応じた獲得エリアに移動させる
     void MoveToCapturedArea(Card card, bool isPlayer)
     {
-        // 選択状態の見た目を完全に初期化
         card.SetSelected(false);
-        card.SetFaceUp(true); // 獲得札は常に表向き
+        card.SetFaceUp(true);
 
-        // 飛ばし先の親トランスフォームを決定する
         Transform targetParent = null;
-
-        // 文字列のブレを考慮して小文字で判定
         string cardType = card.Data.type.ToLower();
 
         if (isPlayer)
@@ -446,10 +385,8 @@ public class GameManager : MonoBehaviour
             else targetParent = eKasuParent;
         }
 
-        // 親を付け替える
         card.transform.SetParent(targetParent);
 
-        // 獲得エリア内での整列（簡易的に並べる）
         int childCount = targetParent.childCount;
         card.transform.localPosition = new Vector3(childCount * 0.2f, 0, -0.01f * childCount);
         card.transform.localRotation = Quaternion.identity;
@@ -463,28 +400,31 @@ public class GameManager : MonoBehaviour
         Card npcChoice = null;
         Card fieldChoice = null;
 
-        foreach (Transform npcCardTr in enemyHandParent)
+        if (fieldView != null)
         {
-            Card npcCard = npcCardTr.GetComponent<Card>();
-            foreach (Transform fieldCardTr in fieldParent)
+            foreach (Transform npcCardTr in enemyHandParent)
             {
-                Card fieldCard = fieldCardTr.GetComponent<Card>();
-                if (npcCard.Data.month == fieldCard.Data.month)
+                Card npcCard = npcCardTr.GetComponent<Card>();
+                foreach (Transform fieldCardTr in fieldView.transform)
                 {
-                    npcChoice = npcCard;
-                    fieldChoice = fieldCard;
-                    break;
+                    Card fieldCard = fieldCardTr.GetComponent<Card>();
+                    if (npcCard.Data.month == fieldCard.Data.month)
+                    {
+                        npcChoice = npcCard;
+                        fieldChoice = fieldCard;
+                        break;
+                    }
                 }
+                if (npcChoice != null) break;
             }
-            if (npcChoice != null) break;
         }
 
         if (npcChoice != null && fieldChoice != null)
         {
             Debug.Log($"【NPC獲得】{npcChoice.Data.month}月が一致しました。");
 
-            // 獲得処理が全て完了した後のコールバックで山札めくりフェーズへ進む
-            CollectPair(npcChoice, fieldChoice, false, () => {
+            CollectPair(npcChoice, fieldChoice, false, () =>
+            {
                 StartCoroutine(DrawFromDeckRoutine(false));
             });
         }
@@ -494,25 +434,25 @@ public class GameManager : MonoBehaviour
             {
                 Card discard = enemyHandParent.GetChild(0).GetComponent<Card>();
                 Debug.Log($"NPCは一致する札がないため、{discard.Data.month}月を場に捨てました。");
-                discard.transform.SetParent(fieldParent);
-                discard.SetFaceUp(true);
-                RearrangeFieldCards();
+
+                // 🌟NPCの捨札もFieldViewを介して追加・自動整列
+                if (fieldView != null)
+                {
+                    fieldView.AddCard(discard, true);
+                }
             }
 
-            // 一致する札がなく場に捨てた場合も、同様に山札めくりフェーズへ進む
             StartCoroutine(DrawFromDeckRoutine(false));
         }
     }
 
     private List<YakuResult> CheckAllYaku(bool isPlayer)
     {
-        // プレイヤーかNPCかに応じて、スキャン対象の親トランスフォーム（獲得エリア）を決定
         List<CardData> capturedCards = new List<CardData>();
         Transform[] targets = isPlayer
             ? new Transform[] { pHikariParent, pTaneParent, pTanParent, pKasuParent }
             : new Transform[] { eHikariParent, eTaneParent, eTanParent, eKasuParent };
 
-        // 指定された獲得エリアから、純粋なデータ（CardData）だけを抽出してリストに溜める
         foreach (var parent in targets)
         {
             if (parent == null) continue;
@@ -526,7 +466,6 @@ public class GameManager : MonoBehaviour
             }
         }
 
-        // 役判定ロジックにデータリストを渡して、成立している役のリストを受け取る
         return YakuEvaluator.CheckAllYaku(capturedCards);
     }
 }

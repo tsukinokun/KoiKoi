@@ -475,7 +475,7 @@ MonoBehaviour:
   cardPrefab: {fileID: 3403582605777476612, guid: 1fdc9263c7335f0469eb2ff7983ba01e, type: 3}
   playerHandParent: {fileID: 1755735233}
   enemyHandParent: {fileID: 1360908143}
-  fieldParent: {fileID: 2052844030}
+  fieldView: {fileID: 2052844031}
   pHikariParent: {fileID: 1173709255}
   pTaneParent: {fileID: 791969109}
   pTanParent: {fileID: 1840815727}
@@ -1337,6 +1337,7 @@ GameObject:
   m_Component:
   - component: {fileID: 2052844030}
   - component: {fileID: 2052844029}
+  - component: {fileID: 2052844031}
   m_Layer: 0
   m_Name: FieldBackground
   m_TagString: Untagged
@@ -1418,6 +1419,20 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &2052844031
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2052844028}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8f3b353209fed3043978213e35eb831e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FieldView
+  xSpacing: 1.2
+  ySpacing: 1.5
 --- !u!1 &2106197765
 GameObject:
   m_ObjectHideFlags: 0
