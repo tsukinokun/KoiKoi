@@ -31,9 +31,17 @@ public class GameManager : MonoBehaviour
     // 次のターンへ進むためのコールバック保持用
     private System.Action _onFlowCompleteCallback;
 
+    // こいこい後に役が更新されたかを判定するための得点記録
+    private int _playerLastTotalPoints = 0;
+    private int _enemyLastTotalPoints = 0;
+
     void Start()
     {
         if (koiKoiChoicePanel != null) koiKoiChoicePanel.SetActive(false);
+
+        // スコア記録をリセット
+        _playerLastTotalPoints = 0;
+        _enemyLastTotalPoints = 0;
 
         if (deckController != null)
         {
@@ -71,7 +79,6 @@ public class GameManager : MonoBehaviour
 
         Transform currentParent = clickedCard.transform.parent;
 
-        // 【フェーズ1: 自分の手札をクリックした時】
         if (playerHandView != null && currentParent == playerHandView.transform)
         {
             if (_currentSelectedCard == clickedCard)
@@ -82,7 +89,6 @@ public class GameManager : MonoBehaviour
                 if (fieldView != null) fieldView.AddCard(clickedCard, true);
                 playerHandView.Rearrange();
 
-                // 🌟手札を場に捨てた場合も、役判定なしですぐ山札めくりへ
                 StartCoroutine(DrawFromDeckRoutine(true));
                 return;
             }
@@ -92,7 +98,6 @@ public class GameManager : MonoBehaviour
             _currentSelectedCard = clickedCard;
             _currentSelectedCard.SetSelected(true);
         }
-        // 【フェーズ2: 手札を選択した状態で、場札をクリックした時】
         else if (fieldView != null && currentParent == fieldView.transform && _currentSelectedCard != null)
         {
             if (_currentSelectedCard.Data == null)
@@ -108,12 +113,9 @@ public class GameManager : MonoBehaviour
                 Card field = clickedCard;
                 _currentSelectedCard = null;
 
-                // 🌟手札での獲得処理（ここでは役判定は行わず、カードの移動のみ）
                 CollectPair(hand, field, true);
 
                 if (playerHandView != null) playerHandView.Rearrange();
-
-                // すぐに山札めくりフェーズへ移行
                 StartCoroutine(DrawFromDeckRoutine(true));
             }
         }
@@ -157,7 +159,6 @@ public class GameManager : MonoBehaviour
         if (matchedFieldCard != null)
         {
             Debug.Log($"【山札めくり一致】{drawnCard.Data.month}月が場札と一致！獲得します。");
-            // 🌟山札めくりでの獲得処理（カードの移動のみ）
             CollectPair(drawnCard, matchedFieldCard, isPlayer);
         }
         else
@@ -165,24 +166,20 @@ public class GameManager : MonoBehaviour
             Debug.Log($"【山札めくり不一致】一致する月がないため、場札に加えます。");
         }
 
-        // 獲得されて減った、あるいは不一致で増えた場札を綺麗に並べ直す
         if (fieldView != null)
         {
             fieldView.Rearrange();
         }
         yield return new WaitForSeconds(0.8f);
 
-        // 🌟【ここが新しい！】手札・山札のすべての処理が終わったので、ここで最終的な役判定を一発だけ行う
         bool isYakuFlowDone = false;
         CheckYakuAndProceed(isPlayer, () =>
         {
             isYakuFlowDone = true;
         });
 
-        // こいこい選択ウィンドウが出ている間は、ここでコルーチンを一時停止させる
         yield return new WaitUntil(() => isYakuFlowDone);
 
-        // 次のターンへ
         SetNextTurn(isPlayer);
     }
 
@@ -200,9 +197,6 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// ペアの獲得処理（純粋に獲得エリアへの移動のみを行う）
-    /// </summary>
     void CollectPair(Card handCard, Card fieldCard, bool isPlayer)
     {
         MoveToCapturedArea(handCard, isPlayer);
@@ -225,31 +219,37 @@ public class GameManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 🌟ターンの最後に一括して役を判定し、進行を分岐させるメソッド
+    /// ターンの最後に一括して役を判定し、進行を分岐させるメソッド
     /// </summary>
     private void CheckYakuAndProceed(bool isPlayer, System.Action onComplete)
     {
         List<YakuResult> activeYakus = CheckAllYaku(isPlayer);
+        int currentTotalPoints = activeYakus.Sum(y => y.Points);
 
-        if (activeYakus.Count > 0)
+        // 対象のプレイヤーの「前回の総得点」を取得
+        int lastTotalPoints = isPlayer ? _playerLastTotalPoints : _enemyLastTotalPoints;
+
+        // 🌟【アルゴリズム修正】今回の総得点が、前回の総得点より高くなっている場合のみ演出へ入る
+        if (activeYakus.Count > 0 && currentTotalPoints > lastTotalPoints)
         {
             string combinedName = string.Join(" ・ ", activeYakus.Select(y => y.Name));
-            int totalPoints = activeYakus.Sum(y => y.Points);
 
             if (yakuWindowManager != null)
             {
-                yakuWindowManager.ShowYaku(combinedName, totalPoints, () =>
+                // 表示する得点は、現在の役の純粋な合計値（currentTotalPoints）を渡す
+                yakuWindowManager.ShowYaku(combinedName, currentTotalPoints, () =>
                 {
                     if (isPlayer)
                     {
-                        // プレイヤーの場合：こいこい選択ダイアログを表示してフローを待機
                         _onFlowCompleteCallback = onComplete;
-                        OpenKoiKoiWindow();
+
+                        // 🌟こいこい選択をする前に、今回の新しいスコアを「最新の確定点数」として一旦キープしておく準備
+                        // (OnKoiKoiSelectedで実際に上書き更新されます)
+                        OpenKoiKoiWindow(currentTotalPoints);
                     }
                     else
                     {
-                        // NPCの場合：ゲーム終了
-                        Debug.Log("NPCが役を完成させました。勝負あり！");
+                        Debug.Log("NPCが役を更新しました。勝負あり！");
                         OnGameEnd(false);
                     }
                 });
@@ -261,28 +261,40 @@ public class GameManager : MonoBehaviour
         }
         else
         {
-            // 役が何もできていなければ、そのまま次のターンへ進行
+            // 役ができていない、あるいは点数が更新されていなければスルーして次のターンへ
             onComplete?.Invoke();
         }
     }
 
-    private void OpenKoiKoiWindow()
+    // 引数で今回の確定スコアを受け取れるように拡張
+    private void OpenKoiKoiWindow(int currentTotalPoints)
     {
         _currentState = TurnState.ChoosingKoiKoi;
         if (koiKoiChoicePanel != null)
         {
             koiKoiChoicePanel.SetActive(true);
+
+            // ボタンが押されたときのために、一時的に現在のスコアをコンポーネント等に忍ばせるか、
+            // もしくはこの時点で一時変数に保持して、選択時に反映させます。
+            _tempCurrentPoints = currentTotalPoints;
         }
         else
         {
+            _tempCurrentPoints = currentTotalPoints;
             OnKoiKoiSelected();
         }
     }
+
+    // 選択中のスコアを一時保持する変数
+    private int _tempCurrentPoints = 0;
 
     public void OnKoiKoiSelected()
     {
         Debug.Log("こいこい！勝負を続行します。");
         if (koiKoiChoicePanel != null) koiKoiChoicePanel.SetActive(false);
+
+        // 🌟こいこいを選択したため、今回の得点を「過去の基準点」として正式登録
+        _playerLastTotalPoints = _tempCurrentPoints;
 
         _onFlowCompleteCallback?.Invoke();
         _onFlowCompleteCallback = null;
@@ -301,11 +313,11 @@ public class GameManager : MonoBehaviour
         _currentState = TurnState.CheckingMatch;
         if (isPlayerWinner)
         {
-            Debug.Log("✨【GAME OVER】プレイヤーの勝ちです！ ✨");
+            Debug.Log($"✨【GAME OVER】プレイヤーの勝ちです！ 最終得点: {CheckAllYaku(true).Sum(y => y.Points)}点 ✨");
         }
         else
         {
-            Debug.Log("💀【GAME OVER】NPCの勝ちです... 💀");
+            Debug.Log($"💀【GAME OVER】NPCの勝ちです... 最終得点: {CheckAllYaku(false).Sum(y => y.Points)}点 💀");
         }
     }
 
