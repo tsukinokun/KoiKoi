@@ -25,7 +25,6 @@ public class GameManager : MonoBehaviour
     [Header("UI Managers")]
     [SerializeField] private YakuWindowManager yakuWindowManager;
 
-    // 🌟インスペクターから紐付ける「こいこい選択パネル」の参照（後述）
     [Header("Koi-Koi UI")]
     [SerializeField] private GameObject koiKoiChoicePanel;
 
@@ -72,6 +71,7 @@ public class GameManager : MonoBehaviour
 
         Transform currentParent = clickedCard.transform.parent;
 
+        // 【フェーズ1: 自分の手札をクリックした時】
         if (playerHandView != null && currentParent == playerHandView.transform)
         {
             if (_currentSelectedCard == clickedCard)
@@ -81,6 +81,8 @@ public class GameManager : MonoBehaviour
 
                 if (fieldView != null) fieldView.AddCard(clickedCard, true);
                 playerHandView.Rearrange();
+
+                // 🌟手札を場に捨てた場合も、役判定なしですぐ山札めくりへ
                 StartCoroutine(DrawFromDeckRoutine(true));
                 return;
             }
@@ -90,6 +92,7 @@ public class GameManager : MonoBehaviour
             _currentSelectedCard = clickedCard;
             _currentSelectedCard.SetSelected(true);
         }
+        // 【フェーズ2: 手札を選択した状態で、場札をクリックした時】
         else if (fieldView != null && currentParent == fieldView.transform && _currentSelectedCard != null)
         {
             if (_currentSelectedCard.Data == null)
@@ -105,11 +108,13 @@ public class GameManager : MonoBehaviour
                 Card field = clickedCard;
                 _currentSelectedCard = null;
 
-                CollectPair(hand, field, true, () =>
-                {
-                    if (playerHandView != null) playerHandView.Rearrange();
-                    StartCoroutine(DrawFromDeckRoutine(true));
-                });
+                // 🌟手札での獲得処理（ここでは役判定は行わず、カードの移動のみ）
+                CollectPair(hand, field, true);
+
+                if (playerHandView != null) playerHandView.Rearrange();
+
+                // すぐに山札めくりフェーズへ移行
+                StartCoroutine(DrawFromDeckRoutine(true));
             }
         }
     }
@@ -128,6 +133,7 @@ public class GameManager : MonoBehaviour
 
         Card drawnCard = deckController.DrawCard();
         if (fieldView != null) fieldView.AddCard(drawnCard, true);
+        Debug.Log($"山札からめくった札: {drawnCard.Data.month}月 ({drawnCard.Data.type})");
 
         Card matchedFieldCard = null;
         if (fieldView != null)
@@ -147,25 +153,36 @@ public class GameManager : MonoBehaviour
         }
 
         yield return new WaitForSeconds(1.0f);
-        bool isDrawingProcessDone = false;
 
         if (matchedFieldCard != null)
         {
-            CollectPair(drawnCard, matchedFieldCard, isPlayer, () =>
-            {
-                isDrawingProcessDone = true;
-            });
+            Debug.Log($"【山札めくり一致】{drawnCard.Data.month}月が場札と一致！獲得します。");
+            // 🌟山札めくりでの獲得処理（カードの移動のみ）
+            CollectPair(drawnCard, matchedFieldCard, isPlayer);
         }
         else
         {
-            isDrawingProcessDone = true;
+            Debug.Log($"【山札めくり不一致】一致する月がないため、場札に加えます。");
         }
 
-        yield return new WaitUntil(() => isDrawingProcessDone);
-
-        if (fieldView != null) fieldView.Rearrange();
+        // 獲得されて減った、あるいは不一致で増えた場札を綺麗に並べ直す
+        if (fieldView != null)
+        {
+            fieldView.Rearrange();
+        }
         yield return new WaitForSeconds(0.8f);
 
+        // 🌟【ここが新しい！】手札・山札のすべての処理が終わったので、ここで最終的な役判定を一発だけ行う
+        bool isYakuFlowDone = false;
+        CheckYakuAndProceed(isPlayer, () =>
+        {
+            isYakuFlowDone = true;
+        });
+
+        // こいこい選択ウィンドウが出ている間は、ここでコルーチンを一時停止させる
+        yield return new WaitUntil(() => isYakuFlowDone);
+
+        // 次のターンへ
         SetNextTurn(isPlayer);
     }
 
@@ -183,47 +200,13 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    void CollectPair(Card handCard, Card fieldCard, bool isPlayer, System.Action onComplete)
+    /// <summary>
+    /// ペアの獲得処理（純粋に獲得エリアへの移動のみを行う）
+    /// </summary>
+    void CollectPair(Card handCard, Card fieldCard, bool isPlayer)
     {
         MoveToCapturedArea(handCard, isPlayer);
         MoveToCapturedArea(fieldCard, isPlayer);
-
-        List<YakuResult> activeYakus = CheckAllYaku(isPlayer);
-
-        if (activeYakus.Count > 0)
-        {
-            _currentState = TurnState.CheckingMatch;
-
-            string combinedName = string.Join(" ・ ", activeYakus.Select(y => y.Name));
-            int totalPoints = activeYakus.Sum(y => y.Points);
-
-            if (yakuWindowManager != null)
-            {
-                yakuWindowManager.ShowYaku(combinedName, totalPoints, () =>
-                {
-                    if (isPlayer)
-                    {
-                        // プレイヤーの場合：こいこい選択ダイアログを表示
-                        _onFlowCompleteCallback = onComplete; // コールバックを一時保存
-                        OpenKoiKoiWindow();
-                    }
-                    else
-                    {
-                        // NPCの場合：現状はシンプルに一律「勝負（あがる）」にしてゲーム終了とします
-                        Debug.Log("NPCが役を完成させました。勝負あり！");
-                        OnGameEnd(false);
-                    }
-                });
-            }
-            else
-            {
-                onComplete?.Invoke();
-            }
-        }
-        else
-        {
-            onComplete?.Invoke();
-        }
     }
 
     void MoveToCapturedArea(Card card, bool isPlayer)
@@ -241,7 +224,48 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    // こいこい選択ウィンドウを開く
+    /// <summary>
+    /// 🌟ターンの最後に一括して役を判定し、進行を分岐させるメソッド
+    /// </summary>
+    private void CheckYakuAndProceed(bool isPlayer, System.Action onComplete)
+    {
+        List<YakuResult> activeYakus = CheckAllYaku(isPlayer);
+
+        if (activeYakus.Count > 0)
+        {
+            string combinedName = string.Join(" ・ ", activeYakus.Select(y => y.Name));
+            int totalPoints = activeYakus.Sum(y => y.Points);
+
+            if (yakuWindowManager != null)
+            {
+                yakuWindowManager.ShowYaku(combinedName, totalPoints, () =>
+                {
+                    if (isPlayer)
+                    {
+                        // プレイヤーの場合：こいこい選択ダイアログを表示してフローを待機
+                        _onFlowCompleteCallback = onComplete;
+                        OpenKoiKoiWindow();
+                    }
+                    else
+                    {
+                        // NPCの場合：ゲーム終了
+                        Debug.Log("NPCが役を完成させました。勝負あり！");
+                        OnGameEnd(false);
+                    }
+                });
+            }
+            else
+            {
+                onComplete?.Invoke();
+            }
+        }
+        else
+        {
+            // 役が何もできていなければ、そのまま次のターンへ進行
+            onComplete?.Invoke();
+        }
+    }
+
     private void OpenKoiKoiWindow()
     {
         _currentState = TurnState.ChoosingKoiKoi;
@@ -251,24 +275,19 @@ public class GameManager : MonoBehaviour
         }
         else
         {
-            // 万が一UIが未設定なら自動でこいこい（続行）させる
-            Debug.LogWarning("koiKoiChoicePanel がアタッチされていないため自動でこいこいします。");
             OnKoiKoiSelected();
         }
     }
 
-    // 🌟ボタンから呼ばれる関数：こいこい（続行）
     public void OnKoiKoiSelected()
     {
         Debug.Log("こいこい！勝負を続行します。");
         if (koiKoiChoicePanel != null) koiKoiChoicePanel.SetActive(false);
 
-        // 保存しておいた次のターンへのフローを再開
         _onFlowCompleteCallback?.Invoke();
         _onFlowCompleteCallback = null;
     }
 
-    // 🌟ボタンから呼ばれる関数：勝負（あがり）
     public void OnAgariSelected()
     {
         Debug.Log("勝負！ここで上がりです。");
@@ -277,10 +296,9 @@ public class GameManager : MonoBehaviour
         OnGameEnd(true);
     }
 
-    // 🌟ゲーム終了処理（今はログを出すだけ。ここにリザルト処理を追加していきます）
     private void OnGameEnd(bool isPlayerWinner)
     {
-        _currentState = TurnState.CheckingMatch; // 進行をロック
+        _currentState = TurnState.CheckingMatch;
         if (isPlayerWinner)
         {
             Debug.Log("✨【GAME OVER】プレイヤーの勝ちです！ ✨");
@@ -320,11 +338,9 @@ public class GameManager : MonoBehaviour
 
         if (npcChoice != null && fieldChoice != null)
         {
-            CollectPair(npcChoice, fieldChoice, false, () =>
-            {
-                if (enemyHandView != null) enemyHandView.Rearrange();
-                StartCoroutine(DrawFromDeckRoutine(false));
-            });
+            CollectPair(npcChoice, fieldChoice, false);
+            if (enemyHandView != null) enemyHandView.Rearrange();
+            StartCoroutine(DrawFromDeckRoutine(false));
         }
         else
         {
