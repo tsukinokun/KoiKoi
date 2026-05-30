@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 using UnityEngine.U2D;
+using System.Linq;
 
 public enum TurnState
 {
@@ -39,6 +40,9 @@ public class GameManager : MonoBehaviour
 
     // 現在選択されているカードの参照
     private Card _currentSelectedCard;
+
+    [Header("UI Managers")]
+    [SerializeField] private YakuWindowManager yakuWindowManager;
 
     void Start()
     {
@@ -232,7 +236,7 @@ public class GameManager : MonoBehaviour
         // 【フェーズ1: 自分の手札をクリックした時】
         if (currentParent == playerHandParent)
         {
-            // ★【変更】すでにこのカードが選択されている状態でもう一度クリックされた場合（ダブルクリック扱い）
+            // ★すでにこのカードが選択されている状態でもう一度クリックされた場合（ダブルクリック扱い：場に捨てる）
             if (_currentSelectedCard == clickedCard)
             {
                 Debug.Log($"手札の再クリックを検知: {clickedCard.Data.month}月を場に捨てます。");
@@ -286,10 +290,10 @@ public class GameManager : MonoBehaviour
 
                 _currentSelectedCard = null;
 
-                CollectPair(hand, field, true);
-
-                // 山札めくりフェーズへ移行
-                StartCoroutine(DrawFromDeckRoutine(true));
+                // 獲得処理と役確認が終わった後に、山札めくりフェーズ（DrawFromDeckRoutine）を実行する
+                CollectPair(hand, field, true, () => {
+                    StartCoroutine(DrawFromDeckRoutine(true));
+                });
             }
             else
             {
@@ -300,34 +304,28 @@ public class GameManager : MonoBehaviour
 
     private IEnumerator DrawFromDeckRoutine(bool isPlayer)
     {
-        // 状態を CheckingMatch にして、一時的にユーザーの入力をブロック
         _currentState = TurnState.CheckingMatch;
 
-        yield return new WaitForSeconds(0.8f); // 前のアクションからの余韻
+        yield return new WaitForSeconds(0.8f);
 
         if (_deck.Count == 0)
         {
             Debug.LogWarning("山札が空になりました。");
-            // 本来はここでゲーム終了・集計ですが、一旦次のターンへ
             SetNextTurn(isPlayer);
             yield break;
         }
 
-        // 山札の末尾（一番上）から1枚めくるポインタを取得
         Card drawnCard = _deck[_deck.Count - 1];
         _deck.RemoveAt(_deck.Count - 1);
 
-        // 一旦場札の領域に仮移動させて表を向ける（「山札からめくった」視覚表現）
         drawnCard.transform.SetParent(fieldParent);
         drawnCard.SetFaceUp(true);
         Debug.Log($"山札からめくった札: {drawnCard.Data.month}月 ({drawnCard.Data.type})");
 
-        // めくった札が場札と一致するかチェック
         Card matchedFieldCard = null;
         foreach (Transform fieldCardTr in fieldParent)
         {
             Card fieldCard = fieldCardTr.GetComponent<Card>();
-            // 自分自身（たった今仮配置したdrawnCard）は除外して比較
             if (fieldCard != null && fieldCard != drawnCard)
             {
                 if (drawnCard.Data.month == fieldCard.Data.month)
@@ -338,27 +336,35 @@ public class GameManager : MonoBehaviour
             }
         }
 
-        yield return new WaitForSeconds(1.0f); // めくったカードをプレイヤーに確認させる時間
+        yield return new WaitForSeconds(1.0f);
+
+        // ★制御フラグ：山札めくり後の処理（獲得演出やUI閉じ待ち）が完了したか
+        bool isDrawingProcessDone = false;
 
         if (matchedFieldCard != null)
         {
             Debug.Log($"【山札めくり一致】{drawnCard.Data.month}月が場札と一致！獲得します。");
-            // めくった札と場札のペアを獲得エリアへ
-            CollectPair(drawnCard, matchedFieldCard, isPlayer);
+
+            // 獲得処理を呼び出し、役ウィンドウが閉じられたタイミングでフラグを true にする
+            CollectPair(drawnCard, matchedFieldCard, isPlayer, () => {
+                isDrawingProcessDone = true;
+            });
         }
         else
         {
             Debug.Log($"【山札めくり不一致】一致する月がないため、場札に加えます。");
-            // 一致しなかったらそのまま場札の仲間入り
-            // （すでに親は fieldParent になっているので並び替えるだけでOK）
+            isDrawingProcessDone = true; // 一致しなかった場合は即座に進行可能にする
         }
+
+        // ラムダ式内（ウィンドウを閉じるボタンが押されるなど）でフラグが立てられるまでコルーチンを待機
+        yield return new WaitUntil(() => isDrawingProcessDone);
 
         // 場札を綺麗に並び替える
         RearrangeFieldCards();
 
         yield return new WaitForSeconds(0.8f);
 
-        // 次のターンへ移行
+        // ➔ 山札から引き終わったため、ヒットの有無に関わらずここで確実に相手へのターン交代を行います
         SetNextTurn(isPlayer);
     }
 
@@ -379,14 +385,37 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    // ペアの獲得処理 (isPlayer: プレイヤーかNPCか)
-    void CollectPair(Card handCard, Card fieldCard, bool isPlayer)
+    // ペアの獲得処理 (isPlayer: プレイヤーかNPCか, onComplete: 演出や確認が全て終了した時に呼ぶコールバック)
+    void CollectPair(Card handCard, Card fieldCard, bool isPlayer, System.Action onComplete)
     {
-        // 1. 手札だった札を獲得エリアへ
+        // 1. 獲得エリアへ移動
         MoveToCapturedArea(handCard, isPlayer);
-
-        // 2. 場にあった札を獲得エリアへ
         MoveToCapturedArea(fieldCard, isPlayer);
+
+        // 2. 成立したすべての役をリストで取得
+        List<YakuResult> activeYakus = CheckAllYaku(isPlayer);
+
+        // 3. 役が1つ以上成立している場合の処理（現時点ではプレイヤー側のみUI表示）
+        if (isPlayer && activeYakus.Count > 0 && yakuWindowManager != null)
+        {
+            // UI表示中は一時的に操作をロック
+            _currentState = TurnState.CheckingMatch;
+
+            // 複数の役名を「 ・ 」で結合
+            string combinedName = string.Join(" ・ ", activeYakus.Select(y => y.Name));
+            // 点数の合計
+            int totalPoints = activeYakus.Sum(y => y.Points);
+
+            // UIを表示し、プレイヤーがウィンドウを閉じたらコールバックを実行
+            yakuWindowManager.ShowYaku(combinedName, totalPoints, () => {
+                onComplete?.Invoke();
+            });
+        }
+        else
+        {
+            // 役が成立していない、またはNPCの場合は、立ち止まらずに即次のステップへ
+            onComplete?.Invoke();
+        }
     }
 
     // 1枚のカードをタイプに応じた獲得エリアに移動させる
@@ -406,22 +435,21 @@ public class GameManager : MonoBehaviour
         {
             if (cardType == "hikari") targetParent = pHikariParent;
             else if (cardType == "tane") targetParent = pTaneParent;
-            else if (cardType == "tan") targetParent = pTanParent;
+            else if (cardType == "tan" || cardType == "tanzaku") targetParent = pTanParent;
             else targetParent = pKasuParent;
         }
         else
         {
             if (cardType == "hikari") targetParent = eHikariParent;
             else if (cardType == "tane") targetParent = eTaneParent;
-            else if (cardType == "tan") targetParent = eTanParent;
+            else if (cardType == "tan" || cardType == "tanzaku") targetParent = eTanParent;
             else targetParent = eKasuParent;
         }
 
         // 親を付け替える
         card.transform.SetParent(targetParent);
 
-        // 獲得エリア内での整列（簡易的にランダムに少しずらして重ねる、またはきれいに並べる）
-        // ここでは一旦、親の中心 (0,0,0) にリセットします（後ほどUIに合わせて調整してください）
+        // 獲得エリア内での整列（簡易的に並べる）
         int childCount = targetParent.childCount;
         card.transform.localPosition = new Vector3(childCount * 0.2f, 0, -0.01f * childCount);
         card.transform.localRotation = Quaternion.identity;
@@ -454,7 +482,11 @@ public class GameManager : MonoBehaviour
         if (npcChoice != null && fieldChoice != null)
         {
             Debug.Log($"【NPC獲得】{npcChoice.Data.month}月が一致しました。");
-            CollectPair(npcChoice, fieldChoice, false);
+
+            // 獲得処理が全て完了した後のコールバックで山札めくりフェーズへ進む
+            CollectPair(npcChoice, fieldChoice, false, () => {
+                StartCoroutine(DrawFromDeckRoutine(false));
+            });
         }
         else
         {
@@ -466,9 +498,112 @@ public class GameManager : MonoBehaviour
                 discard.SetFaceUp(true);
                 RearrangeFieldCards();
             }
+
+            // 一致する札がなく場に捨てた場合も、同様に山札めくりフェーズへ進む
+            StartCoroutine(DrawFromDeckRoutine(false));
+        }
+    }
+
+    private List<YakuResult> CheckAllYaku(bool isPlayer)
+    {
+        List<YakuResult> results = new List<YakuResult>();
+
+        // プレイヤーかNPCかに応じて、スキャン対象の親トランスフォームを決定
+        List<CardData> capturedCards = new List<CardData>();
+        Transform[] targets = isPlayer
+            ? new Transform[] { pHikariParent, pTaneParent, pTanParent, pKasuParent }
+            : new Transform[] { eHikariParent, eTaneParent, eTanParent, eKasuParent };
+
+        foreach (var parent in targets)
+        {
+            if (parent == null) continue;
+            foreach (Transform child in parent)
+            {
+                Card card = child.GetComponent<Card>();
+                if (card != null && card.Data != null)
+                {
+                    capturedCards.Add(card.Data);
+                }
+            }
         }
 
-        // 【変更】ここで即プレイヤーに返さず、NPCの山札めくりフェーズへ進む
-        StartCoroutine(DrawFromDeckRoutine(false));
+        // --- 各種カウント・フラグ処理 ---
+        int hikariCount = capturedCards.Count(c => c.type == "Hikari");
+        int kasuCount = capturedCards.Count(c => c.type == "Kasu");
+        int taneCount = capturedCards.Count(c => c.type == "Tane");
+        // type名が "Tan" と "Tanzaku" のどちらでもヒットするように小文字にして判定
+        int tanzakuCount = capturedCards.Count(c => c.type.ToLower() == "tan" || c.type.ToLower() == "tanzaku");
+
+        bool hasAme = capturedCards.Any(c => c.tags.Contains("Ame"));
+        bool hasSakazuki = capturedCards.Any(c => c.tags.Contains("Sakazuki"));
+
+        int inoshikachoCount = capturedCards.Count(c => c.tags.Contains("Inoshikacho"));
+        int akatanCount = capturedCards.Count(c => c.tags.Contains("Akatan"));
+        int aotanCount = capturedCards.Count(c => c.tags.Contains("Aotan"));
+
+        // ----------------------------------------------------
+        // 判定①：光札系（上位の役が下位の役を内包するため独占型）
+        // ----------------------------------------------------
+        if (hikariCount == 5)
+        {
+            results.Add(new YakuResult("五光", 15));
+        }
+        else if (hikariCount == 4 && !hasAme)
+        {
+            results.Add(new YakuResult("四光", 8));
+        }
+        else if (hikariCount == 4 && hasAme)
+        {
+            results.Add(new YakuResult("雨四光", 7));
+        }
+        else if (hikariCount == 3 && !hasAme)
+        {
+            results.Add(new YakuResult("三光", 5));
+        }
+
+        // ----------------------------------------------------
+        // 判定②：独立した特殊役（重複して成立する）
+        // ----------------------------------------------------
+        if (inoshikachoCount == 3)
+        {
+            results.Add(new YakuResult("猪鹿蝶", 5));
+        }
+        if (akatanCount == 3)
+        {
+            results.Add(new YakuResult("赤短", 5));
+        }
+        if (aotanCount == 3)
+        {
+            results.Add(new YakuResult("青短", 5));
+        }
+
+        // 花見で一杯 (盃 ＋ 桜に幕)
+        if (hasSakazuki && capturedCards.Any(c => c.month == 3 && c.type == "Hikari"))
+        {
+            results.Add(new YakuResult("花見で一杯", 5));
+        }
+        // 月見で一杯 (盃 ＋ ススキに月)
+        if (hasSakazuki && capturedCards.Any(c => c.month == 8 && c.type == "Hikari"))
+        {
+            results.Add(new YakuResult("月見で一杯", 5));
+        }
+
+        // ----------------------------------------------------
+        // 判定③：枚数系の通常役（重複して成立する）
+        // ----------------------------------------------------
+        if (taneCount >= 5)
+        {
+            results.Add(new YakuResult("タネ", 1 + (taneCount - 5)));
+        }
+        if (tanzakuCount >= 5)
+        {
+            results.Add(new YakuResult("タン", 1 + (tanzakuCount - 5)));
+        }
+        if (kasuCount >= 10)
+        {
+            results.Add(new YakuResult("かす", 1 + (kasuCount - 10)));
+        }
+
+        return results;
     }
 }
