@@ -473,8 +473,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: '::'
   cardAtlas: {fileID: 4343727234628468602, guid: dede874a0c49aac4cb1442d371f08af3, type: 2}
   cardPrefab: {fileID: 3403582605777476612, guid: 1fdc9263c7335f0469eb2ff7983ba01e, type: 3}
-  playerHandParent: {fileID: 1755735233}
-  enemyHandParent: {fileID: 1360908143}
+  playerHandView: {fileID: 1755735234}
+  enemyHandView: {fileID: 1360908144}
   fieldView: {fileID: 2052844031}
   pHikariParent: {fileID: 1173709255}
   pTaneParent: {fileID: 791969109}
@@ -859,6 +859,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1360908143}
+  - component: {fileID: 1360908144}
   m_Layer: 0
   m_Name: EnemyHand
   m_TagString: Untagged
@@ -881,6 +882,21 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1360908144
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1360908142}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ad5b2fd2c13a7a14787262432eb70839, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::HandView
+  isEnemy: 1
+  radius: 12
+  angleStep: 5
 --- !u!1 &1364253011
 GameObject:
   m_ObjectHideFlags: 0
@@ -1243,6 +1259,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1755735233}
+  - component: {fileID: 1755735234}
   m_Layer: 0
   m_Name: PlayerHand
   m_TagString: Untagged
@@ -1265,6 +1282,21 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1755735234
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1755735232}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ad5b2fd2c13a7a14787262432eb70839, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::HandView
+  isEnemy: 0
+  radius: 12
+  angleStep: 5
 --- !u!4 &1840815727 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 6961984081888483442, guid: e3a0b4d53f4c7554783dd102a207f3c6, type: 3}
