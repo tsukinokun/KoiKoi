@@ -1,7 +1,7 @@
-using UnityEngine;
+ï»¿using UnityEngine;
 
 /// <summary>
-/// Šl“¾‚µ‚½D‚ğƒ^ƒCƒviŒõEíE’ZûEƒJƒXj‚²‚Æ‚Éd•ª‚¯A®—ñ‚³‚¹‚éƒrƒ…[ƒRƒ“ƒ|[ƒlƒ“ƒg
+/// ç²å¾—ã—ãŸæœ­ã‚’ã‚¿ã‚¤ãƒ—ï¼ˆå…‰ãƒ»ç¨®ãƒ»çŸ­å†Šãƒ»ã‚«ã‚¹ï¼‰ã”ã¨ã«ä»•åˆ†ã‘ã€æ•´åˆ—ã•ã›ã‚‹ãƒ“ãƒ¥ãƒ¼ã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆ
 /// </summary>
 public class CapturedAreaView : MonoBehaviour
 {
@@ -12,20 +12,22 @@ public class CapturedAreaView : MonoBehaviour
     [SerializeField] private Transform kasuParent;
 
     [Header("Layout Settings")]
-    [SerializeField] private float xSpacing = 0.2f; // ‰¡‚É‚¸‚ç‚·•
+    [SerializeField] private float xSpacing = 0.3f; // æ¨ªã«ãšã‚‰ã™å¹…
+    [SerializeField] private Vector3 cardScale = new Vector3(0.5f, 0.5f, 1f); // ç²å¾—æœ­ã®å¤§ãã•
+
+    [Tooltip("è¦ªã®ä¸­å¿ƒã‹ã‚‰ã€ã©ã‚Œãã‚‰ã„å·¦å´ã‹ã‚‰ä¸¦ã¹å§‹ã‚ã‚‹ã‹ï¼ˆãƒã‚¤ãƒŠã‚¹å€¤ã§å·¦ã¸ï¼‰")]
+    [SerializeField] private float xStartOffset = -1.5f; // ğŸŒŸã“ã“ã‚’ã‚¤ãƒ³ã‚¹ãƒšã‚¯ã‚¿ãƒ¼ã§èª¿æ•´ã—ã¦å·¦ç«¯ã«åˆã‚ã›ã¾ã™
 
     /// <summary>
-    /// ƒJ[ƒh‚ğƒ^ƒCƒv‚É‰‚¶‚Ä“KØ‚Èeƒgƒ‰ƒ“ƒXƒtƒH[ƒ€‚ÉŠ„‚èU‚èAãY—í‚É®—ñ‚³‚¹‚é
+    /// ã‚«ãƒ¼ãƒ‰ã‚’ã‚¿ã‚¤ãƒ—ã«å¿œã˜ã¦é©åˆ‡ãªè¦ªãƒˆãƒ©ãƒ³ã‚¹ãƒ•ã‚©ãƒ¼ãƒ ã«å‰²ã‚ŠæŒ¯ã‚Šã€ç¶ºéº—ã«æ•´åˆ—ã•ã›ã‚‹
     /// </summary>
     public void AddCard(Card card, string cardType)
     {
         if (card == null) return;
 
-        // •¶š—ñ‚ÌƒuƒŒ‚ğl—¶‚µ‚Ä¬•¶š‰»
         string typeKey = cardType.ToLower();
         Transform targetParent = null;
 
-        // “KØ‚Èe‚ğŒˆ’è
         if (typeKey == "hikari") targetParent = hikariParent;
         else if (typeKey == "tane") targetParent = taneParent;
         else if (typeKey == "tan" || typeKey == "tanzaku") targetParent = tanParent;
@@ -33,18 +35,22 @@ public class CapturedAreaView : MonoBehaviour
 
         if (targetParent == null)
         {
-            Debug.LogWarning($"Šl“¾ƒGƒŠƒA‚Ìeƒgƒ‰ƒ“ƒXƒtƒH[ƒ€‚ª–¢İ’è‚Å‚·Bƒ^ƒCƒv: {cardType}");
-            targetParent = this.transform; // Åˆ«‚ÌƒP[ƒX‚Í©g‚Ì’¼‰º‚É“ü‚ê‚é
+            Debug.LogWarning($"ç²å¾—ã‚¨ãƒªã‚¢ã®è¦ªãƒˆãƒ©ãƒ³ã‚¹ãƒ•ã‚©ãƒ¼ãƒ ãŒæœªè¨­å®šã§ã™ã€‚ã‚¿ã‚¤ãƒ—: {cardType}");
+            targetParent = this.transform;
         }
 
-        // e‚ğ•t‚¯‘Ö‚¦‚é
         card.transform.SetParent(targetParent);
 
-        // Šl“¾ƒGƒŠƒA“à‚Å‚Ì®—ñŒvZiGameManager‚©‚çˆø‚Á‰z‚µ‚Ä‚«‚½ƒƒWƒbƒNj
+        // ã‚µã‚¤ã‚ºèª¿æ•´
+        card.transform.localScale = cardScale;
+
+        // ç²å¾—ã‚¨ãƒªã‚¢å†…ã§ã®æ•´åˆ—è¨ˆç®—
         int childCount = targetParent.childCount;
 
-        // Z²‚ğ‹Í‚©‚Éè‘O‚Éo‚·‚±‚Æ‚ÅAd‚È‚è‚Ì•`‰æ‡iƒ\[ƒgj‚ğ³‚µ‚­•Û‚Â
-        card.transform.localPosition = new Vector3((childCount - 1) * xSpacing, 0, -0.01f * childCount);
+        // ğŸŒŸ xStartOffsetï¼ˆåˆæœŸã®å·¦ã‚ºãƒ¬åˆ†ï¼‰ã‚’è¶³ã™ã“ã¨ã§ã€è¦ªã®ä½ç½®ãŒçœŸã‚“ä¸­ã§ã‚‚å·¦ç«¯ã‹ã‚‰ä¸¦ã³ã¾ã™
+        float xPosition = xStartOffset + ((childCount - 1) * xSpacing);
+
+        card.transform.localPosition = new Vector3(xPosition, 0, -0.01f * childCount);
         card.transform.localRotation = Quaternion.identity;
     }
 }
