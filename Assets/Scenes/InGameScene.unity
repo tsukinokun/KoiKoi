@@ -452,6 +452,7 @@ GameObject:
   m_Component:
   - component: {fileID: 352264725}
   - component: {fileID: 352264724}
+  - component: {fileID: 352264726}
   m_Layer: 0
   m_Name: GameManager
   m_TagString: Untagged
@@ -471,8 +472,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c85e19d368b1fed4a9744e4bba6a913f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
-  cardAtlas: {fileID: 4343727234628468602, guid: dede874a0c49aac4cb1442d371f08af3, type: 2}
-  cardPrefab: {fileID: 3403582605777476612, guid: 1fdc9263c7335f0469eb2ff7983ba01e, type: 3}
+  deckController: {fileID: 352264726}
   playerHandView: {fileID: 1755735234}
   enemyHandView: {fileID: 1360908144}
   fieldView: {fileID: 2052844031}
@@ -494,6 +494,20 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &352264726
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 352264723}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e83756b070798004f867ec694b77af3c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DeckController
+  cardAtlas: {fileID: 4343727234628468602, guid: dede874a0c49aac4cb1442d371f08af3, type: 2}
+  cardPrefab: {fileID: 3403582605777476612, guid: 1fdc9263c7335f0469eb2ff7983ba01e, type: 3}
 --- !u!1 &425898390
 GameObject:
   m_ObjectHideFlags: 0

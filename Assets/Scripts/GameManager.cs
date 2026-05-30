@@ -1,16 +1,14 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
-using System.IO;
 using UnityEngine;
-using UnityEngine.U2D;
 using System.Linq;
 
 public class GameManager : MonoBehaviour
 {
     private TurnState _currentState = TurnState.PlayerTurn;
 
-    public SpriteAtlas cardAtlas;
-    public GameObject cardPrefab;
+    [Header("Deck Controller")]
+    public DeckController deckController; // 🌟新設した山札コントローラー
 
     [Header("Hand & Field Views")]
     public HandView playerHandView;       // プレイヤー手札の管理ビュー
@@ -18,11 +16,8 @@ public class GameManager : MonoBehaviour
     public FieldView fieldView;           // 場札の管理ビュー
 
     [Header("Captured Area Views")]
-    public CapturedAreaView playerCapturedView; // 🌟プレイヤー獲得札の管理ビュー
-    public CapturedAreaView enemyCapturedView;  // 🌟相手獲得札の管理ビュー
-
-    // これが「山札」の実体です
-    private List<Card> _deck = new List<Card>();
+    public CapturedAreaView playerCapturedView; // プレイヤー獲得札の管理ビュー
+    public CapturedAreaView enemyCapturedView;  // 相手獲得札の管理ビュー
 
     // 現在選択されているカードの参照
     private Card _currentSelectedCard;
@@ -32,66 +27,14 @@ public class GameManager : MonoBehaviour
 
     void Start()
     {
-        // JSONを読み込み、48枚を生成して山札に入れる
-        CreateDeck();
-
-        // 山札をシャッフルする
-        Shuffle();
+        // 🌟山札の生成とシャッフルをコントローラーに委譲
+        if (deckController != null)
+        {
+            deckController.InitializeDeck();
+        }
 
         // カードを配る
         DealInitialCards();
-    }
-
-    void CreateDeck()
-    {
-        string path = Path.Combine(Application.streamingAssetsPath, "JSON", "cards_master.json");
-        string jsonText = File.ReadAllText(path);
-
-        string wrappedJson = "{\"cards\":" + jsonText + "}";
-
-        // 成形した wrappedJson を読み込む
-        CardList cardList = JsonUtility.FromJson<CardList>(wrappedJson);
-
-        Sprite backSprite = cardAtlas.GetSprite("Card_Back");
-
-        if (cardList == null || cardList.cards == null)
-        {
-            Debug.LogError("JSONのパースに失敗しました。形式を確認してください。");
-            return;
-        }
-
-        foreach (var data in cardList.cards)
-        {
-            // 生成
-            GameObject go = Instantiate(cardPrefab);
-            Sprite faceSprite = cardAtlas.GetSprite(data.id);
-            Debug.Log(data.id);
-
-            Card card = go.GetComponent<Card>();
-            // データ、表面、裏面をセットして初期化
-            card.Initialize(data, faceSprite, backSprite);
-
-            // 山札の定位置（左側など）に移動させて裏向きにする
-            go.transform.position = new Vector3(-5f, 0, 0);
-            card.SetFaceUp(false);
-
-            // リストに溜める
-            _deck.Add(card);
-        }
-        Debug.Log($"山札に {_deck.Count} 枚準備しました。");
-    }
-
-    void Shuffle()
-    {
-        // フィッシャー–イェーツのシャッフル
-        for (int i = _deck.Count - 1; i > 0; i--)
-        {
-            int j = Random.Range(0, i + 1);
-            Card temp = _deck[i];
-            _deck[i] = _deck[j];
-            _deck[j] = temp;
-        }
-        Debug.Log("シャッフル完了！");
     }
 
     // 最初の手札・場札を配る
@@ -110,22 +53,20 @@ public class GameManager : MonoBehaviour
     // 山札から1枚引いて手札に追加する抽象化されたメソッド
     void DistributeHandCard(HandView targetHand, bool isFaceUp)
     {
-        if (_deck.Count == 0 || targetHand == null) return;
+        if (deckController == null || deckController.Count == 0 || targetHand == null) return;
 
-        Card card = _deck[_deck.Count - 1];
-        _deck.RemoveAt(_deck.Count - 1);
-
+        // 🌟DeckControllerから1枚引く
+        Card card = deckController.DrawCard();
         targetHand.AddCard(card, isFaceUp);
     }
 
     // 山札から1枚引いて場札に追加する抽象化されたメソッド
     void DistributeFieldCard(bool isFaceUp)
     {
-        if (_deck.Count == 0 || fieldView == null) return;
+        if (deckController == null || deckController.Count == 0 || fieldView == null) return;
 
-        Card card = _deck[_deck.Count - 1];
-        _deck.RemoveAt(_deck.Count - 1);
-
+        // 🌟DeckControllerから1枚引く
+        Card card = deckController.DrawCard();
         fieldView.AddCard(card, isFaceUp);
     }
 
@@ -144,7 +85,6 @@ public class GameManager : MonoBehaviour
         // 【フェーズ1: 自分の手札をクリックした時】
         if (playerHandView != null && currentParent == playerHandView.transform)
         {
-            // ★すでにこのカードが選択されている状態でもう一度クリックされた場合（ダブルクリック扱い：場に捨てる）
             if (_currentSelectedCard == clickedCard)
             {
                 Debug.Log($"手札の再クリックを検知: {clickedCard.Data.month}月を場に捨てます。");
@@ -152,16 +92,13 @@ public class GameManager : MonoBehaviour
                 _currentSelectedCard = null;
                 clickedCard.SetSelected(false);
 
-                // FieldViewにカードの追加と再整列を任せる
                 if (fieldView != null)
                 {
                     fieldView.AddCard(clickedCard, true);
                 }
 
-                // 手札からカードが1枚減ったので、手札の扇形をきれいに詰め直す
                 playerHandView.Rearrange();
 
-                // 自分の山札めくりフェーズへ移行
                 StartCoroutine(DrawFromDeckRoutine(true));
                 return;
             }
@@ -171,7 +108,6 @@ public class GameManager : MonoBehaviour
                 _currentSelectedCard.SetSelected(false);
             }
 
-            // 新しく手札を選択
             _currentSelectedCard = clickedCard;
             _currentSelectedCard.SetSelected(true);
             Debug.Log($"手札を選択しました: {_currentSelectedCard.Data.month}月 ({_currentSelectedCard.Data.type})");
@@ -186,7 +122,6 @@ public class GameManager : MonoBehaviour
                 return;
             }
 
-            // 月が一致するかチェック
             if (_currentSelectedCard.Data.month == clickedCard.Data.month)
             {
                 Debug.Log($"【手札獲得一致】{_currentSelectedCard.Data.month}月が一致しました！");
@@ -196,12 +131,9 @@ public class GameManager : MonoBehaviour
 
                 _currentSelectedCard = null;
 
-                // 獲得処理と役確認が終わった後に、山札めくりフェーズを実行
                 CollectPair(hand, field, true, () =>
                 {
-                    // 獲得されて手札から無くなったため、扇形をきれいに詰め直す
                     if (playerHandView != null) playerHandView.Rearrange();
-
                     StartCoroutine(DrawFromDeckRoutine(true));
                 });
             }
@@ -218,17 +150,16 @@ public class GameManager : MonoBehaviour
 
         yield return new WaitForSeconds(0.8f);
 
-        if (_deck.Count == 0)
+        if (deckController == null || deckController.Count == 0)
         {
             Debug.LogWarning("山札が空になりました。");
             SetNextTurn(isPlayer);
             yield break;
         }
 
-        Card drawnCard = _deck[_deck.Count - 1];
-        _deck.RemoveAt(_deck.Count - 1);
+        // 🌟DeckControllerから山札めくり用のカードを1枚引く
+        Card drawnCard = deckController.DrawCard();
 
-        // 山札からめくったカードをFieldViewに追加（自動整列される）
         if (fieldView != null)
         {
             fieldView.AddCard(drawnCard, true);
@@ -273,7 +204,6 @@ public class GameManager : MonoBehaviour
 
         yield return new WaitUntil(() => isDrawingProcessDone);
 
-        // 獲得されて減った、あるいは不一致で増えた場札を綺麗に並べ直す
         if (fieldView != null)
         {
             fieldView.Rearrange();
@@ -284,7 +214,6 @@ public class GameManager : MonoBehaviour
         SetNextTurn(isPlayer);
     }
 
-    // ターンを交代する補助関数
     void SetNextTurn(bool currentIsPlayer)
     {
         if (currentIsPlayer)
@@ -299,17 +228,13 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    // ペアの獲得処理
     void CollectPair(Card handCard, Card fieldCard, bool isPlayer, System.Action onComplete)
     {
-        // 1. 獲得エリアへ移動（🌟専用Viewにお任せ）
         MoveToCapturedArea(handCard, isPlayer);
         MoveToCapturedArea(fieldCard, isPlayer);
 
-        // 2. 成立したすべての役をリストで取得
         List<YakuResult> activeYakus = CheckAllYaku(isPlayer);
 
-        // 3. 役が1つ以上成立している場合の処理
         if (isPlayer && activeYakus.Count > 0 && yakuWindowManager != null)
         {
             _currentState = TurnState.CheckingMatch;
@@ -328,26 +253,18 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    // 1枚のカードをタイプに応じた獲得エリアに移動させる
     void MoveToCapturedArea(Card card, bool isPlayer)
     {
         card.SetSelected(false);
         card.SetFaceUp(true);
 
-        // 🌟プレイヤーと敵で、それぞれに対応したCapturedAreaViewに処理を丸投げする
         if (isPlayer)
         {
-            if (playerCapturedView != null)
-            {
-                playerCapturedView.AddCard(card, card.Data.type);
-            }
+            if (playerCapturedView != null) playerCapturedView.AddCard(card, card.Data.type);
         }
         else
         {
-            if (enemyCapturedView != null)
-            {
-                enemyCapturedView.AddCard(card, card.Data.type);
-            }
+            if (enemyCapturedView != null) enemyCapturedView.AddCard(card, card.Data.type);
         }
     }
 
@@ -384,9 +301,7 @@ public class GameManager : MonoBehaviour
 
             CollectPair(npcChoice, fieldChoice, false, () =>
             {
-                // 獲得されて敵手札から無くなったため、敵手札の扇形を詰め直す
                 if (enemyHandView != null) enemyHandView.Rearrange();
-
                 StartCoroutine(DrawFromDeckRoutine(false));
             });
         }
@@ -397,13 +312,11 @@ public class GameManager : MonoBehaviour
                 Card discard = enemyHandView.transform.GetChild(0).GetComponent<Card>();
                 Debug.Log($"NPCは一致する札がないため、{discard.Data.month}月を場に捨てました。");
 
-                // NPCの捨札もFieldViewを介して追加・自動整列
                 if (fieldView != null)
                 {
                     fieldView.AddCard(discard, true);
                 }
 
-                // 捨てて手札から減ったため、敵手札の扇形を詰め直す
                 enemyHandView.Rearrange();
             }
 
@@ -413,13 +326,11 @@ public class GameManager : MonoBehaviour
 
     private List<YakuResult> CheckAllYaku(bool isPlayer)
     {
-        // 🌟スキャン対象のViewコンポーネントを特定
         CapturedAreaView targetView = isPlayer ? playerCapturedView : enemyCapturedView;
         List<CardData> capturedCards = new List<CardData>();
 
         if (targetView != null)
         {
-            // Viewオブジェクトの下にある、各カテゴリ親（光・種・短・カス）を走査する
             foreach (Transform categoryParent in targetView.transform)
             {
                 foreach (Transform child in categoryParent)
