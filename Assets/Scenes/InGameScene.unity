@@ -1048,6 +1048,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1360908143}
   - component: {fileID: 1360908144}
+  - component: {fileID: 1360908145}
   m_Layer: 0
   m_Name: EnemyHand
   m_TagString: Untagged
@@ -1085,6 +1086,19 @@ MonoBehaviour:
   isEnemy: 1
   radius: 12
   angleStep: 5
+--- !u!210 &1360908145
+SortingGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1360908142}
+  m_Enabled: 1
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 20
+  m_SortAtRoot: 0
+  m_Sort3DAs2D: 0
 --- !u!1 &1364253011
 GameObject:
   m_ObjectHideFlags: 0
@@ -1755,6 +1769,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1755735233}
   - component: {fileID: 1755735234}
+  - component: {fileID: 1755735235}
   m_Layer: 0
   m_Name: PlayerHand
   m_TagString: Untagged
@@ -1792,6 +1807,19 @@ MonoBehaviour:
   isEnemy: 0
   radius: 12
   angleStep: 5
+--- !u!210 &1755735235
+SortingGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1755735232}
+  m_Enabled: 1
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 20
+  m_SortAtRoot: 0
+  m_Sort3DAs2D: 0
 --- !u!4 &1840815727 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 6961984081888483442, guid: e3a0b4d53f4c7554783dd102a207f3c6, type: 3}
@@ -1865,6 +1893,7 @@ GameObject:
   - component: {fileID: 2052844030}
   - component: {fileID: 2052844029}
   - component: {fileID: 2052844031}
+  - component: {fileID: 2052844032}
   m_Layer: 0
   m_Name: FieldBackground
   m_TagString: Untagged
@@ -1960,6 +1989,19 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::FieldView
   xSpacing: 1.2
   ySpacing: 1.5
+--- !u!210 &2052844032
+SortingGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2052844028}
+  m_Enabled: 1
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_SortAtRoot: 0
+  m_Sort3DAs2D: 0
 --- !u!1 &2106197765
 GameObject:
   m_ObjectHideFlags: 0
