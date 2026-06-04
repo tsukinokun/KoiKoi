@@ -1,8 +1,8 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 public class Card : MonoBehaviour
 {
-    // ���̃J�[�h�������Ă���f�[�^
+    // このカードが持っているデータ
     public CardData Data { get; private set; }
 
     private Sprite _faceSprite;
@@ -10,10 +10,13 @@ public class Card : MonoBehaviour
     private SpriteRenderer _sr;
 
     private bool _isSelected = false;
-    private Vector3 _originalLocalPos; // �I���������ɖ߂�ꏊ
+    private Vector3 _originalLocalPos; // 選択解除時に戻る場所
 
-    // GameManager����Ă΂�鏉�����֐�
-    // �����̐��ƌ^���AGameManager�̌Ăяo����(data, face, back)�ƍ��킹��̂��|�C���g�ł�
+    [Header("Glow Effect")]
+    [SerializeField] private GameObject glowObject; // エフェクトオブジェクトをUnity上で紐付ける枠
+
+    // GameManagerから呼ばれる初期化関数
+    // 引数の数と型を、GameManagerの呼び出し側(data, face, back)と合わせるのがポイントです
     public void Initialize(CardData data, Sprite face, Sprite back)
     {
         this.Data = data;
@@ -22,11 +25,14 @@ public class Card : MonoBehaviour
 
         _sr = GetComponent<SpriteRenderer>();
 
-        // �ŏ��͎R�D�Ȃ̂ŗ�����
+        // 最初は山札なので裏向き
         SetFaceUp(false);
+
+        // 初期状態（山札の中など）ではエフェクトを非表示にする
+        SetGlow(false);
     }
 
-    // �\����؂�ւ���֐�
+    // 表裏を切り替える関数
     public void SetFaceUp(bool isFaceUp)
     {
         if (_sr == null) _sr = GetComponent<SpriteRenderer>();
@@ -35,7 +41,7 @@ public class Card : MonoBehaviour
 
     private void OnMouseDown()
     {
-        // GameManager�ɒʒm
+        // GameManagerに通知
         GameManager gm = Object.FindAnyObjectByType<GameManager>();
         if (gm != null)
         {
@@ -52,16 +58,28 @@ public class Card : MonoBehaviour
 
         if (_isSelected)
         {
-            // �I�����ꂽ�班����ɂ��炷
+            // 選択されたら少し上にずらす
             _originalLocalPos = transform.localPosition;
             transform.localPosition += new Vector3(0, 0.3f, 0);
-            _sr.color = Color.yellow; // ���o�I�ɕ�����₷���F��ς���i�C�Ӂj
+            _sr.color = Color.yellow; // 視覚的に分かりやすく色を変える（任意）
         }
         else
         {
-            // �������ꂽ�猳�̈ʒu�ɖ߂�
+            // 解除されたら元の位置に戻す
             transform.localPosition = _originalLocalPos;
             _sr.color = Color.white;
+        }
+    }
+
+    /// <summary>
+    /// 🌟カードの周りの光るエフェクトを表示・非表示にする関数
+    /// </summary>
+    public void SetGlow(bool active)
+    {
+        if (glowObject != null)
+        {
+            // SetActive(true) になると、CardGlowEffect の OnEnable() が走り、自動的にUpdateで線形補間されます
+            glowObject.SetActive(active);
         }
     }
 }

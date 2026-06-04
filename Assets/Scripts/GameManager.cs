@@ -48,6 +48,9 @@ public class GameManager : MonoBehaviour
             deckController.InitializeDeck();
         }
         DealInitialCards();
+
+        // 🌟ゲーム開始時、プレイヤーの最初の手札のエフェクトをチェック
+        HighlightMatchableCards();
     }
 
     void DealInitialCards()
@@ -89,6 +92,11 @@ public class GameManager : MonoBehaviour
                 if (fieldView != null) fieldView.AddCard(clickedCard, true);
                 playerHandView.Rearrange();
 
+                clickedCard.SetGlow(false);
+
+                // 🌟プレイヤーの「思考（選択）」が終了したため、即座に手札の光をすべて切る
+                ClearAllHandGlows();
+
                 StartCoroutine(DrawFromDeckRoutine(true));
                 return;
             }
@@ -116,6 +124,10 @@ public class GameManager : MonoBehaviour
                 CollectPair(hand, field, true);
 
                 if (playerHandView != null) playerHandView.Rearrange();
+
+                // 🌟札を合わせて獲得し、プレイヤーの「思考」が終了したため、即座に手札の光をすべて切る
+                ClearAllHandGlows();
+
                 StartCoroutine(DrawFromDeckRoutine(true));
             }
         }
@@ -188,12 +200,19 @@ public class GameManager : MonoBehaviour
         if (currentIsPlayer)
         {
             _currentState = TurnState.NPCTurn;
+
+            // 🌟念のため、NPCターンに移行する際も完全にプレイヤーの手札の光を切る
+            ClearAllHandGlows();
+
             StartCoroutine(NPCTurnRoutine());
         }
         else
         {
             _currentState = TurnState.PlayerTurn;
             Debug.Log("あなたのターンです。");
+
+            // 🌟プレイヤーのターン（思考開始）になったので、ここで初めて光らせる
+            HighlightMatchableCards();
         }
     }
 
@@ -208,6 +227,8 @@ public class GameManager : MonoBehaviour
         card.SetSelected(false);
         card.SetFaceUp(true);
 
+        card.SetGlow(false);
+
         if (isPlayer)
         {
             if (playerCapturedView != null) playerCapturedView.AddCard(card, card.Data.type);
@@ -218,33 +239,24 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// ターンの最後に一括して役を判定し、進行を分岐させるメソッド
-    /// </summary>
     private void CheckYakuAndProceed(bool isPlayer, System.Action onComplete)
     {
         List<YakuResult> activeYakus = CheckAllYaku(isPlayer);
         int currentTotalPoints = activeYakus.Sum(y => y.Points);
 
-        // 対象のプレイヤーの「前回の総得点」を取得
         int lastTotalPoints = isPlayer ? _playerLastTotalPoints : _enemyLastTotalPoints;
 
-        // 🌟【アルゴリズム修正】今回の総得点が、前回の総得点より高くなっている場合のみ演出へ入る
         if (activeYakus.Count > 0 && currentTotalPoints > lastTotalPoints)
         {
             string combinedName = string.Join(" ・ ", activeYakus.Select(y => y.Name));
 
             if (yakuWindowManager != null)
             {
-                // 表示する得点は、現在の役の純粋な合計値（currentTotalPoints）を渡す
                 yakuWindowManager.ShowYaku(combinedName, currentTotalPoints, () =>
                 {
                     if (isPlayer)
                     {
                         _onFlowCompleteCallback = onComplete;
-
-                        // 🌟こいこい選択をする前に、今回の新しいスコアを「最新の確定点数」として一旦キープしておく準備
-                        // (OnKoiKoiSelectedで実際に上書き更新されます)
                         OpenKoiKoiWindow(currentTotalPoints);
                     }
                     else
@@ -261,21 +273,16 @@ public class GameManager : MonoBehaviour
         }
         else
         {
-            // 役ができていない、あるいは点数が更新されていなければスルーして次のターンへ
             onComplete?.Invoke();
         }
     }
 
-    // 引数で今回の確定スコアを受け取れるように拡張
     private void OpenKoiKoiWindow(int currentTotalPoints)
     {
         _currentState = TurnState.ChoosingKoiKoi;
         if (koiKoiChoicePanel != null)
         {
             koiKoiChoicePanel.SetActive(true);
-
-            // ボタンが押されたときのために、一時的に現在のスコアをコンポーネント等に忍ばせるか、
-            // もしくはこの時点で一時変数に保持して、選択時に反映させます。
             _tempCurrentPoints = currentTotalPoints;
         }
         else
@@ -285,7 +292,6 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    // 選択中のスコアを一時保持する変数
     private int _tempCurrentPoints = 0;
 
     public void OnKoiKoiSelected()
@@ -293,7 +299,6 @@ public class GameManager : MonoBehaviour
         Debug.Log("こいこい！勝負を続行します。");
         if (koiKoiChoicePanel != null) koiKoiChoicePanel.SetActive(false);
 
-        // 🌟こいこいを選択したため、今回の得点を「過去の基準点」として正式登録
         _playerLastTotalPoints = _tempCurrentPoints;
 
         _onFlowCompleteCallback?.Invoke();
@@ -386,5 +391,48 @@ public class GameManager : MonoBehaviour
             }
         }
         return YakuEvaluator.CheckAllYaku(capturedCards);
+    }
+
+    // 🌟追加メソッド：場札をスキャンし、一致する月を持つプレイヤーの手札のエフェクトをONにする
+    private void HighlightMatchableCards()
+    {
+        if (playerHandView == null || fieldView == null) return;
+
+        // 現在の場札（fieldViewの子要素）にある月をすべてHashSetに入れる
+        HashSet<int> fieldMonths = new HashSet<int>();
+        foreach (Transform fieldCardTr in fieldView.transform)
+        {
+            Card fieldCard = fieldCardTr.GetComponent<Card>();
+            if (fieldCard != null && fieldCard.Data != null)
+            {
+                fieldMonths.Add(fieldCard.Data.month);
+            }
+        }
+
+        // プレイヤーの手札をループし、場札と同じ月があれば Card.SetGlow(true) を呼ぶ
+        foreach (Transform handCardTr in playerHandView.transform)
+        {
+            Card handCard = handCardTr.GetComponent<Card>();
+            if (handCard != null && handCard.Data != null)
+            {
+                bool canCapture = fieldMonths.Contains(handCard.Data.month);
+                handCard.SetGlow(canCapture); // Cardクラスの既存関数を呼び出し
+            }
+        }
+    }
+
+    // 🌟追加メソッド：プレイヤーの手札のエフェクトをすべて一斉にクリアする
+    private void ClearAllHandGlows()
+    {
+        if (playerHandView == null) return;
+
+        foreach (Transform handCardTr in playerHandView.transform)
+        {
+            Card handCard = handCardTr.GetComponent<Card>();
+            if (handCard != null)
+            {
+                handCard.SetGlow(false); // エフェクトをオフにする
+            }
+        }
     }
 }
