@@ -1,4 +1,7 @@
-﻿using UnityEngine;
+﻿using System;
+using System.Threading;
+using Cysharp.Threading.Tasks; // 🌟UniTaskのインポート
+using UnityEngine;
 
 public class Card : MonoBehaviour
 {
@@ -15,8 +18,9 @@ public class Card : MonoBehaviour
     [Header("Glow Effect")]
     [SerializeField] private GameObject glowObject; // エフェクトオブジェクトをUnity上で紐付ける枠
 
-    // GameManagerから呼ばれる初期化関数
-    // 引数の数と型を、GameManagerの呼び出し側(data, face, back)と合わせるのがポイントです
+    // 🌟移動中かどうかを判定するフラグ（移動中にクリックされるのを防ぐなどの用途に）
+    public bool IsMoving { get; private set; } = false;
+
     public void Initialize(CardData data, Sprite face, Sprite back)
     {
         this.Data = data;
@@ -41,9 +45,11 @@ public class Card : MonoBehaviour
 
     private void OnMouseDown()
     {
+        // 🌟移動中はクリックを受け付けない（バグ防止）
+        if (IsMoving) return;
+
         // GameManagerに通知
-        GameManager gm = Object.FindAnyObjectByType<GameManager>();
-        if (gm != null)
+        GameManager gm = GameObject.FindAnyObjectByType<GameManager>(); if (gm != null)
         {
             gm.OnCardSelected(this);
             Debug.Log($"Card clicked: {Data.id}", this);
@@ -71,15 +77,46 @@ public class Card : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// 🌟カードの周りの光るエフェクトを表示・非表示にする関数
-    /// </summary>
     public void SetGlow(bool active)
     {
         if (glowObject != null)
         {
-            // SetActive(true) になると、CardGlowEffect の OnEnable() が走り、自動的にUpdateで線形補間されます
             glowObject.SetActive(active);
         }
+    }
+
+    /// <summary>
+    /// 🌟追加：指定した世界座標（World Position）へ滑らかに移動させる非同期関数
+    /// </summary>
+    /// <param name="targetWorldPosition">移動先のワールド座標</param>
+    /// <param name="duration">移動にかける時間（秒）</param>
+    /// <param name="cancellationToken">GameObjectが破棄された時にタスクを安全に止めるためのトークン</param>
+    public async UniTask MoveToPositionAsync(Vector3 targetWorldPosition, float duration, CancellationToken cancellationToken = default)
+    {
+        IsMoving = true;
+        Vector3 startPosition = transform.position;
+        float elapsedTime = 0f;
+
+        while (elapsedTime < duration)
+        {
+            // 途中でゲーム終了やシーン遷移、オブジェクト破棄があったら安全に抜ける
+            cancellationToken.ThrowIfCancellationRequested();
+
+            elapsedTime += Time.deltaTime;
+            float t = elapsedTime / duration;
+
+            // イージング（SmoothStepで加速・減速を滑らかに）
+            t = Mathf.SmoothStep(0f, 1f, t);
+
+            // ワールド座標を補間
+            transform.position = Vector3.Lerp(startPosition, targetWorldPosition, t);
+
+            // Unityの通常のUpdateタイミングまで1フレーム待機
+            await UniTask.Yield(PlayerLoopTiming.Update, cancellationToken);
+        }
+
+        // 最後に確実に目標座標に合わせる
+        transform.position = targetWorldPosition;
+        IsMoving = false;
     }
 }

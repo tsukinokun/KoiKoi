@@ -1,7 +1,10 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using System.Linq;
+using Cysharp.Threading.Tasks; // 🌟UniTaskのインポート
+using System.Threading;        // 🌟CancellationToken用
 
 public class GameManager : MonoBehaviour
 {
@@ -33,10 +36,17 @@ public class GameManager : MonoBehaviour
 
     // こいこい後に役が更新されたかを判定するための得点記録
     private int _playerLastTotalPoints = 0;
+
     private int _enemyLastTotalPoints = 0;
+
+    // 🌟オブジェクトが破棄された（シーン遷移やゲーム終了）時に非同期処理を安全に止めるためのトークン
+    private CancellationToken _destroyToken;
 
     void Start()
     {
+        // 🌟破棄用トークンの取得
+        _destroyToken = this.GetCancellationTokenOnDestroy();
+
         if (koiKoiChoicePanel != null) koiKoiChoicePanel.SetActive(false);
 
         // スコア記録をリセット
@@ -49,7 +59,7 @@ public class GameManager : MonoBehaviour
         }
         DealInitialCards();
 
-        // 🌟ゲーム開始時、プレイヤーの最初の手札のエフェクトをチェック
+        // ゲーム開始時、プレイヤーの最初の手札のエフェクトをチェック
         HighlightMatchableCards();
     }
 
@@ -85,7 +95,7 @@ public class GameManager : MonoBehaviour
         // --- 1. プレイヤーの手札がクリックされた場合 ---
         if (playerHandView != null && currentParent == playerHandView.transform)
         {
-            // すでに選択されている手札を「もう一度クリック」した場合（今回の修正コア）
+            // すでに選択されている手札を「もう一度クリック」した場合
             if (_currentSelectedCard == clickedCard)
             {
                 // 場札から同じ月のカードをすべてリストアップする
@@ -112,12 +122,11 @@ public class GameManager : MonoBehaviour
                     hand.SetSelected(false);
                     _currentSelectedCard = null;
 
-                    // ペアを獲得
-                    CollectPair(hand, field, true);
+                    // ペアを獲得（※この中で移動演出の待機等を行うため非同期メソッドに変更）
+                    CollectPairAsync(hand, field, true).Forget(); // 🌟 Forgetで呼び出し
 
                     if (playerHandView != null) playerHandView.Rearrange();
                     ClearAllHandGlows();
-                    StartCoroutine(DrawFromDeckRoutine(true));
                 }
                 // パターンB：取れるカードが「2枚以上」の場合 → 場札の該当カードを光らせて、クリックを待つ
                 else if (matchingFieldCards.Count >= 2)
@@ -134,8 +143,6 @@ public class GameManager : MonoBehaviour
                     {
                         fc.SetGlow(true); // 取得可能な場札を光らせる
                     }
-
-                    // 手札の選択状態は維持したまま、メソッドを抜けて場札のクリックを待つ
                 }
                 // パターンC：取れるカードが「ない」場合 → そのまま場札として出す
                 else
@@ -150,7 +157,8 @@ public class GameManager : MonoBehaviour
                     clickedCard.SetGlow(false);
                     ClearAllHandGlows();
 
-                    StartCoroutine(DrawFromDeckRoutine(true));
+                    // 🌟コルーチンの代わりにUniTask版ルーチンを呼び出し (.Forget())
+                    DrawFromDeckRoutineAsync(true).Forget();
                 }
                 return;
             }
@@ -191,7 +199,8 @@ public class GameManager : MonoBehaviour
                 Card field = clickedCard;
                 _currentSelectedCard = null;
 
-                CollectPair(hand, field, true);
+                // 🌟獲得演出付きの非同期メソッドを起動
+                CollectPairAsync(hand, field, true).Forget();
 
                 if (playerHandView != null) playerHandView.Rearrange();
 
@@ -202,26 +211,33 @@ public class GameManager : MonoBehaviour
                     if (fc != null) fc.SetGlow(false);
                 }
                 ClearAllHandGlows();
-
-                StartCoroutine(DrawFromDeckRoutine(true));
             }
         }
     }
 
-    private IEnumerator DrawFromDeckRoutine(bool isPlayer)
+    /// <summary>
+    /// 🌟コルーチンから変更：山札からめくる非同期ルーチン
+    /// </summary>
+    private async UniTaskVoid DrawFromDeckRoutineAsync(bool isPlayer)
     {
         _currentState = TurnState.CheckingMatch;
-        yield return new WaitForSeconds(0.8f);
+
+        // 🌟 yield return new WaitForSeconds の代わり
+        await UniTask.Delay(TimeSpan.FromSeconds(0.8f), cancellationToken: _destroyToken);
 
         if (deckController == null || deckController.Count == 0)
         {
             Debug.LogWarning("山札が空になりました。");
             SetNextTurn(isPlayer);
-            yield break;
+            return;
         }
 
         Card drawnCard = deckController.DrawCard();
+
+        // 🌟演出のために、めくったカードを一瞬「山札の位置」に固定してから場へ補間移動させる場合：
+        // Vector3 deckPos = deckController.transform.position; // (山札の座標がある場合)
         if (fieldView != null) fieldView.AddCard(drawnCard, true);
+
         Debug.Log($"山札からめくった札: {drawnCard.Data.month}月 ({drawnCard.Data.type})");
 
         Card matchedFieldCard = null;
@@ -241,12 +257,13 @@ public class GameManager : MonoBehaviour
             }
         }
 
-        yield return new WaitForSeconds(1.0f);
+        await UniTask.Delay(TimeSpan.FromSeconds(1.0f), cancellationToken: _destroyToken);
 
         if (matchedFieldCard != null)
         {
             Debug.Log($"【山札めくり一致】{drawnCard.Data.month}月が場札と一致！獲得します。");
-            CollectPair(drawnCard, matchedFieldCard, isPlayer);
+            // 🌟めくり札と場札が一致した時も、演出完了を待ってから次に進む
+            await CollectPairAsync(drawnCard, matchedFieldCard, isPlayer, shouldTriggerNextStep: false);
         }
         else
         {
@@ -257,7 +274,7 @@ public class GameManager : MonoBehaviour
         {
             fieldView.Rearrange();
         }
-        yield return new WaitForSeconds(0.8f);
+        await UniTask.Delay(TimeSpan.FromSeconds(0.8f), cancellationToken: _destroyToken);
 
         bool isYakuFlowDone = false;
         CheckYakuAndProceed(isPlayer, () =>
@@ -265,7 +282,8 @@ public class GameManager : MonoBehaviour
             isYakuFlowDone = true;
         });
 
-        yield return new WaitUntil(() => isYakuFlowDone);
+        // 🌟 yield return new WaitUntil の代わり
+        await UniTask.WaitUntil(() => isYakuFlowDone, cancellationToken: _destroyToken);
 
         SetNextTurn(isPlayer);
     }
@@ -275,33 +293,51 @@ public class GameManager : MonoBehaviour
         if (currentIsPlayer)
         {
             _currentState = TurnState.NPCTurn;
-
-            // 🌟念のため、NPCターンに移行する際も完全にプレイヤーの手札の光を切る
             ClearAllHandGlows();
 
-            StartCoroutine(NPCTurnRoutine());
+            // 🌟コルーチンからUniTask版へ変更
+            NPCTurnRoutineAsync().Forget();
         }
         else
         {
             _currentState = TurnState.PlayerTurn;
             Debug.Log("あなたのターンです。");
-
-            // 🌟プレイヤーのターン（思考開始）になったので、ここで初めて光らせる
             HighlightMatchableCards();
         }
     }
 
-    void CollectPair(Card handCard, Card fieldCard, bool isPlayer)
+    /// <summary>
+    /// 🌟新規非同期メソッド：2枚のカードを札エリアへ滑らかに移動させ、完了したら次のステップ（山札めくり等）を呼ぶ
+    /// </summary>
+    private async UniTask CollectPairAsync(Card handCard, Card fieldCard, bool isPlayer, bool shouldTriggerNextStep = true)
     {
+        // 1. 各自の獲得先Viewの目標位置を取得する
+        // (※現在、各ViewのAddCardが内部で即時座標を確定させていると仮定し、移動先座標を特定します)
+        CapturedAreaView targetCapturedView = isPlayer ? playerCapturedView : enemyCapturedView;
+
+        // 💡もしAddCardする前に移動させたい場合、一旦AddCardを呼び出して配置先を確定させてから
+        // 元の座標に戻してスライドさせる（手順2のアプローチ）を行います。
+
+        // 現状は安全に、移動処理を並行して実行して完了を待ちます
+        // (各ViewのAddCardの中で即時SetParentされてジャンプしている場合、View側を後述のように調整するとより綺麗になります)
         MoveToCapturedArea(handCard, isPlayer);
         MoveToCapturedArea(fieldCard, isPlayer);
+
+        // 🌟演出時間を仮に 0.4 秒として、2枚同時に移動完了するのをきっちり待つ
+        // (もし Card.MoveToPositionAsync を直接 await する場合は、View側の即時配置と競合しないよう調整が必要です)
+        await UniTask.Delay(TimeSpan.FromSeconds(0.4f), cancellationToken: _destroyToken);
+
+        // 次のステップに進むフラグがON（手札からペアを取った時など）であれば山札めくりへ
+        if (shouldTriggerNextStep)
+        {
+            DrawFromDeckRoutineAsync(isPlayer).Forget();
+        }
     }
 
     void MoveToCapturedArea(Card card, bool isPlayer)
     {
         card.SetSelected(false);
         card.SetFaceUp(true);
-
         card.SetGlow(false);
 
         if (isPlayer)
@@ -318,7 +354,6 @@ public class GameManager : MonoBehaviour
     {
         List<YakuResult> activeYakus = CheckAllYaku(isPlayer);
         int currentTotalPoints = activeYakus.Sum(y => y.Points);
-
         int lastTotalPoints = isPlayer ? _playerLastTotalPoints : _enemyLastTotalPoints;
 
         if (activeYakus.Count > 0 && currentTotalPoints > lastTotalPoints)
@@ -401,10 +436,13 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    private IEnumerator NPCTurnRoutine()
+    /// <summary>
+    /// 🌟コルーチンから変更：NPCの思考非同期ルーチン
+    /// </summary>
+    private async UniTaskVoid NPCTurnRoutineAsync()
     {
         Debug.Log("NPCが考えています...");
-        yield return new WaitForSeconds(1.5f);
+        await UniTask.Delay(TimeSpan.FromSeconds(1.5f), cancellationToken: _destroyToken);
 
         Card npcChoice = null;
         Card fieldChoice = null;
@@ -430,9 +468,9 @@ public class GameManager : MonoBehaviour
 
         if (npcChoice != null && fieldChoice != null)
         {
-            CollectPair(npcChoice, fieldChoice, false);
+            // 🌟NPCがペアを獲得した時も、演出を挟んでから山札めくりへ進む
+            await CollectPairAsync(npcChoice, fieldChoice, false);
             if (enemyHandView != null) enemyHandView.Rearrange();
-            StartCoroutine(DrawFromDeckRoutine(false));
         }
         else
         {
@@ -441,8 +479,11 @@ public class GameManager : MonoBehaviour
                 Card discard = enemyHandView.transform.GetChild(0).GetComponent<Card>();
                 if (fieldView != null) fieldView.AddCard(discard, true);
                 enemyHandView.Rearrange();
+
+                // 🌟NPCが手札を場に「捨てる」時の一瞬の待機（演出時間を加味）
+                await UniTask.Delay(TimeSpan.FromSeconds(0.4f), cancellationToken: _destroyToken);
             }
-            StartCoroutine(DrawFromDeckRoutine(false));
+            DrawFromDeckRoutineAsync(false).Forget();
         }
     }
 
@@ -468,12 +509,10 @@ public class GameManager : MonoBehaviour
         return YakuEvaluator.CheckAllYaku(capturedCards);
     }
 
-    // 🌟追加メソッド：場札をスキャンし、一致する月を持つプレイヤーの手札のエフェクトをONにする
     private void HighlightMatchableCards()
     {
         if (playerHandView == null || fieldView == null) return;
 
-        // 現在の場札（fieldViewの子要素）にある月をすべてHashSetに入れる
         HashSet<int> fieldMonths = new HashSet<int>();
         foreach (Transform fieldCardTr in fieldView.transform)
         {
@@ -484,19 +523,17 @@ public class GameManager : MonoBehaviour
             }
         }
 
-        // プレイヤーの手札をループし、場札と同じ月があれば Card.SetGlow(true) を呼ぶ
         foreach (Transform handCardTr in playerHandView.transform)
         {
             Card handCard = handCardTr.GetComponent<Card>();
             if (handCard != null && handCard.Data != null)
             {
                 bool canCapture = fieldMonths.Contains(handCard.Data.month);
-                handCard.SetGlow(canCapture); // Cardクラスの既存関数を呼び出し
+                handCard.SetGlow(canCapture);
             }
         }
     }
 
-    // 🌟追加メソッド：プレイヤーの手札のエフェクトをすべて一斉にクリアする
     private void ClearAllHandGlows()
     {
         if (playerHandView == null) return;
@@ -506,7 +543,7 @@ public class GameManager : MonoBehaviour
             Card handCard = handCardTr.GetComponent<Card>();
             if (handCard != null)
             {
-                handCard.SetGlow(false); // エフェクトをオフにする
+                handCard.SetGlow(false);
             }
         }
     }
