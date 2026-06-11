@@ -145,14 +145,23 @@ public class GameManager : MonoBehaviour
             if (_currentSelectedCard.Data.month == clickedCard.Data.month)
             {
                 Card hand = _currentSelectedCard;
-                Card field = clickedCard;
                 _currentSelectedCard = null;
 
                 // 選択状態を解除
                 hand.SetSelected(false);
 
-                // 🌟手札クリック時と「完全に同じ」安全なルートで獲得処理を実行
-                CollectPairAsync(hand, field, true).Forget();
+                // 🌟 場に3枚出ている特殊パターンのチェック
+                List<Card> matchingFieldCards = GetMatchingFieldCards(hand.Data.month);
+                if (matchingFieldCards.Count == 3)
+                {
+                    // 3枚総取りルート
+                    CollectMultipleAsync(hand, matchingFieldCards, true).Forget();
+                }
+                else
+                {
+                    // 通常の1枚選択ルート
+                    CollectPairAsync(hand, clickedCard, true).Forget();
+                }
 
                 ClearAllFieldGlows();
                 ClearAllHandGlows();
@@ -165,22 +174,23 @@ public class GameManager : MonoBehaviour
     /// </summary>
     private void ExecuteAutoCapture(Card clickedHandCard)
     {
-        // 場札から同じ月のカードをすべてリストアップする
-        List<Card> matchingFieldCards = new List<Card>();
-        if (fieldView != null)
-        {
-            foreach (Transform fieldCardTr in fieldView.transform)
-            {
-                Card fieldCard = fieldCardTr.GetComponent<Card>();
-                if (fieldCard != null && fieldCard.Data != null && fieldCard.Data.month == clickedHandCard.Data.month)
-                {
-                    matchingFieldCards.Add(fieldCard);
-                }
-            }
-        }
+        List<Card> matchingFieldCards = GetMatchingFieldCards(clickedHandCard.Data.month);
 
+        // パターン特例：取れるカードが「3枚」の場合 → 3枚すべてを総取りする
+        if (matchingFieldCards.Count == 3)
+        {
+            Debug.Log("場に同じ月のカードが3枚あるため、総取りします！");
+            Card hand = clickedHandCard;
+            _currentSelectedCard = null;
+            hand.SetSelected(false);
+
+            CollectMultipleAsync(hand, matchingFieldCards, true).Forget();
+
+            ClearAllHandGlows();
+            ClearAllFieldGlows();
+        }
         // パターンA：取れるカードが「1枚だけ」の場合 → 自動でそのカードを取る
-        if (matchingFieldCards.Count == 1)
+        else if (matchingFieldCards.Count == 1)
         {
             Card hand = clickedHandCard;
             Card field = matchingFieldCards[0];
@@ -193,8 +203,8 @@ public class GameManager : MonoBehaviour
             ClearAllHandGlows();
             ClearAllFieldGlows();
         }
-        // パターンB：取れるカードが「2枚以上」の場合 → 場札の該当カードを光らせて、クリックを待つ
-        else if (matchingFieldCards.Count >= 2)
+        // パターンB：取れるカードが「2枚」の場合 → 場札の該当カードを光らせて、どちらを取るかクリックを待つ
+        else if (matchingFieldCards.Count == 2)
         {
             Debug.Log($"取れるカードが {matchingFieldCards.Count} 枚あります。場札を選択してください。");
             HighlightMatchingFieldCards(clickedHandCard.Data.month);
@@ -217,6 +227,25 @@ public class GameManager : MonoBehaviour
 
             DrawFromDeckRoutineAsync(true).Forget();
         }
+    }
+
+    /// <summary>
+    /// 指定された月の場札をリストアップするヘルパー
+    /// </summary>
+    private List<Card> GetMatchingFieldCards(int month)
+    {
+        List<Card> list = new List<Card>();
+        if (fieldView == null) return list;
+
+        foreach (Transform fieldCardTr in fieldView.transform)
+        {
+            Card fieldCard = fieldCardTr.GetComponent<Card>();
+            if (fieldCard != null && fieldCard.Data != null && fieldCard.Data.month == month)
+            {
+                list.Add(fieldCard);
+            }
+        }
+        return list;
     }
 
     /// <summary>
@@ -267,18 +296,18 @@ public class GameManager : MonoBehaviour
 
         Debug.Log($"山札からめくった札: {drawnCard.Data.month}月 ({drawnCard.Data.type})");
 
-        Card matchedFieldCard = null;
+        // 山札から引いたカードと一致する場札（自分自身は除く）を全て取得
+        List<Card> matchingFieldCards = new List<Card>();
         if (fieldView != null)
         {
             foreach (Transform fieldCardTr in fieldView.transform)
             {
                 Card fieldCard = fieldCardTr.GetComponent<Card>();
-                if (fieldCard != null && fieldCard != drawnCard)
+                if (fieldCard != null && fieldCard != drawnCard && fieldCard.Data != null)
                 {
                     if (drawnCard.Data.month == fieldCard.Data.month)
                     {
-                        matchedFieldCard = fieldCard;
-                        break;
+                        matchingFieldCards.Add(fieldCard);
                     }
                 }
             }
@@ -286,10 +315,20 @@ public class GameManager : MonoBehaviour
 
         await UniTask.Delay(TimeSpan.FromSeconds(1.0f), cancellationToken: _destroyToken);
 
-        if (matchedFieldCard != null)
+        if (matchingFieldCards.Count > 0)
         {
-            Debug.Log($"【山札めくり一致】{drawnCard.Data.month}月が場札と一致！獲得します。");
-            await CollectPairAsync(drawnCard, matchedFieldCard, isPlayer, shouldTriggerNextStep: false);
+            // 🌟 山札からめくった時も、場に3枚あれば総取り（合計4枚獲得）になる
+            if (matchingFieldCards.Count == 3)
+            {
+                Debug.Log($"【山札めくり3枚一致】{drawnCard.Data.month}月が場札の3枚すべてと一致！総取りします。");
+                await CollectMultipleAsync(drawnCard, matchingFieldCards, isPlayer, shouldTriggerNextStep: false);
+            }
+            else
+            {
+                // 通常時（1枚、または2枚あるうちの1枚。2枚の時はルール上どれを貰っても同じなので最初の1枚を選択）
+                Debug.Log($"【山札めくり一致】{drawnCard.Data.month}月が場札と一致！獲得します。");
+                await CollectPairAsync(drawnCard, matchingFieldCards[0], isPlayer, shouldTriggerNextStep: false);
+            }
         }
         else
         {
@@ -330,6 +369,9 @@ public class GameManager : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// 通常の1対1のペア獲得処理
+    /// </summary>
     private async UniTask CollectPairAsync(Card handCard, Card fieldCard, bool isPlayer, bool shouldTriggerNextStep = true)
     {
         if (handCard != null && fieldCard != null)
@@ -339,25 +381,17 @@ public class GameManager : MonoBehaviour
 
             // 1. 場札のビューへと親の所属を変更
             handCard.transform.SetParent(fieldView.transform, worldPositionStays: true);
-
-            // ズレ対策：強制的に元のワールド座標を再代入
             handCard.transform.position = originalWorldPos;
 
-            // ✨ 親の離脱が確定したこの瞬間に、手札側の再整列（Rearrange）をキックする
-            if (isPlayer && playerHandView != null)
-            {
-                playerHandView.Rearrange(handCard);
-            }
-            else if (!isPlayer && enemyHandView != null)
-            {
-                enemyHandView.Rearrange(handCard);
-            }
+            // ✨ 親の離脱が確定した瞬間に手札側を再整列
+            if (isPlayer && playerHandView != null) playerHandView.Rearrange(handCard);
+            else if (!isPlayer && enemyHandView != null) enemyHandView.Rearrange(handCard);
 
             handCard.SetSelected(false);
             handCard.SetGlow(false);
             handCard.SetFaceUp(true);
 
-            // 2. 移動先のローカル座標を算出
+            // 2. 移動先のローカル座標を算出（重ね合わせ効果）
             Vector3 fieldLocalPos = fieldCard.transform.localPosition;
             Vector3 overlapTargetPos = new Vector3(fieldLocalPos.x + 0.15f, fieldLocalPos.y - 0.15f, fieldLocalPos.z - 0.05f);
 
@@ -374,6 +408,58 @@ public class GameManager : MonoBehaviour
 
         MoveToCapturedArea(handCard, isPlayer);
         MoveToCapturedArea(fieldCard, isPlayer);
+
+        float duration = (targetCapturedView != null) ? targetCapturedView.MoveDuration : 0.4f;
+        await UniTask.Delay(TimeSpan.FromSeconds(duration), cancellationToken: _destroyToken);
+
+        if (shouldTriggerNextStep)
+        {
+            DrawFromDeckRoutineAsync(isPlayer).Forget();
+        }
+    }
+
+    /// <summary>
+    /// 🌟場札が3枚ある場合の「総取り（1枚＋3枚の計4枚）」獲得処理
+    /// </summary>
+    private async UniTask CollectMultipleAsync(Card handCard, List<Card> fieldCards, bool isPlayer, bool shouldTriggerNextStep = true)
+    {
+        if (handCard != null && fieldCards != null && fieldCards.Count > 0)
+        {
+            Vector3 originalWorldPos = handCard.transform.position;
+
+            // 場札ビューへと親を変更
+            handCard.transform.SetParent(fieldView.transform, worldPositionStays: true);
+            handCard.transform.position = originalWorldPos;
+
+            if (isPlayer && playerHandView != null) playerHandView.Rearrange(handCard);
+            else if (!isPlayer && enemyHandView != null) enemyHandView.Rearrange(handCard);
+
+            handCard.SetSelected(false);
+            handCard.SetGlow(false);
+            handCard.SetFaceUp(true);
+
+            // 演出として、3枚のうち真ん中（1番目）のカードに向けて重ね合わせるように移動
+            Vector3 targetLocalPos = fieldCards[0].transform.localPosition;
+            Vector3 overlapTargetPos = new Vector3(targetLocalPos.x + 0.15f, targetLocalPos.y - 0.15f, targetLocalPos.z - 0.05f);
+            handCard.transform.localRotation = fieldCards[0].transform.localRotation;
+
+            float overlapDuration = 0.5f;
+            handCard.MoveToLocalPositionAsync(overlapTargetPos, overlapDuration, handCard.GetCancellationTokenOnDestroy()).Forget();
+
+            await UniTask.Delay(TimeSpan.FromSeconds(overlapDuration + 0.05f), cancellationToken: _destroyToken);
+        }
+
+        // 獲得札エリアへ移動（出したカード＋場札3枚の合計4枚）
+        CapturedAreaView targetCapturedView = isPlayer ? playerCapturedView : enemyCapturedView;
+
+        MoveToCapturedArea(handCard, isPlayer);
+        if (fieldCards != null)
+        {
+            foreach (Card fc in fieldCards)
+            {
+                MoveToCapturedArea(fc, isPlayer);
+            }
+        }
 
         float duration = (targetCapturedView != null) ? targetCapturedView.MoveDuration : 0.4f;
         await UniTask.Delay(TimeSpan.FromSeconds(duration), cancellationToken: _destroyToken);
@@ -492,30 +578,34 @@ public class GameManager : MonoBehaviour
         await UniTask.Delay(TimeSpan.FromSeconds(1.5f), cancellationToken: _destroyToken);
 
         Card npcChoice = null;
-        Card fieldChoice = null;
+        List<Card> fieldChoices = new List<Card>();
 
         if (fieldView != null && enemyHandView != null)
         {
             foreach (Transform npcCardTr in enemyHandView.transform)
             {
                 Card npcCard = npcCardTr.GetComponent<Card>();
-                foreach (Transform fieldCardTr in fieldView.transform)
+                List<Card> matches = GetMatchingFieldCards(npcCard.Data.month);
+                if (matches.Count > 0)
                 {
-                    Card fieldCard = fieldCardTr.GetComponent<Card>();
-                    if (npcCard.Data.month == fieldCard.Data.month)
-                    {
-                        npcChoice = npcCard;
-                        fieldChoice = fieldCard;
-                        break;
-                    }
+                    npcChoice = npcCard;
+                    fieldChoices = matches;
+                    break;
                 }
-                if (npcChoice != null) break;
             }
         }
 
-        if (npcChoice != null && fieldChoice != null)
+        if (npcChoice != null && fieldChoices.Count > 0)
         {
-            await CollectPairAsync(npcChoice, fieldChoice, false);
+            // 🌟 NPCの処理も3枚場に出ている時は総取りルーチンへ分岐させる
+            if (fieldChoices.Count == 3)
+            {
+                await CollectMultipleAsync(npcChoice, fieldChoices, false);
+            }
+            else
+            {
+                await CollectPairAsync(npcChoice, fieldChoices[0], false);
+            }
         }
         else
         {
@@ -524,7 +614,6 @@ public class GameManager : MonoBehaviour
                 Card discard = enemyHandView.transform.GetChild(0).GetComponent<Card>();
                 if (fieldView != null) fieldView.AddCard(discard, true);
 
-                // 手札を捨てた瞬間、即座にNPCの手札を詰める
                 enemyHandView.Rearrange(discard);
 
                 await UniTask.Delay(TimeSpan.FromSeconds(0.4f), cancellationToken: _destroyToken);

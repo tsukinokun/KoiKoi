@@ -10,7 +10,7 @@ public class HandView : MonoBehaviour
     [SerializeField] private float angleStep = 5.0f;   // カード間の角度
 
     [Header("Animation Settings")]
-    [SerializeField] private float moveDuration = 0.4f; // ぬるっと動く時間
+    [SerializeField] private float moveDuration = 0.2f; // ぬるっと動く時間
 
     /// <summary>
     /// GameManager側（DistributeHandCard）からは今まで通りこの形で呼ばれる
