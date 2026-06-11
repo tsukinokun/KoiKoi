@@ -53,31 +53,49 @@ public class HandView : MonoBehaviour
     /// <summary>
     /// ゲーム中に札をプレイして「手札が減った時」に、隙間を綺麗に詰めるために呼び出す
     /// </summary>
-    public void Rearrange()
+    // 🌟 修正：除外したいカード（出したカード）を引数で受け取れるようにする（デフォルトはnull）
+    public void Rearrange(Card ignoreCard = null)
     {
-        int childCount = this.transform.childCount;
-        if (childCount == 0) return;
-
-        int index = 0;
+        // 1️⃣ 実際に残る有効なカードだけをリスト化する
+        List<Card> activeCards = new List<Card>();
         foreach (Transform child in this.transform)
         {
             Card card = child.GetComponent<Card>();
             if (card == null) continue;
 
+            // 出したカード、または非アクティブなカードは除外
+            if (card == ignoreCard || !card.gameObject.activeSelf) continue;
+
+            activeCards.Add(card);
+        }
+
+        int activeCount = activeCards.Count;
+        if (activeCount == 0) return;
+
+        // 2️⃣ 厳密に残った枚数（activeCount）を基準に扇形の配置を再計算する
+        for (int index = 0; index < activeCount; index++)
+        {
+            Card card = activeCards[index];
+
             float baseAngle = isEnemy ? 270.0f : 90.0f;
-            float centerOffset = (childCount - 1) / 2f;
+
+            // 🌟 childCount ではなく、確定した残り枚数（activeCount）を使う
+            float centerOffset = (activeCount - 1) / 2f;
             float currentAngle = baseAngle + (index - centerOffset) * angleStep * (isEnemy ? 1 : -1);
             float rad = currentAngle * Mathf.Deg2Rad;
 
             float x = Mathf.Cos(rad) * radius;
             float y = (Mathf.Sin(rad) * radius) + (isEnemy ? radius : -radius);
 
+            // 🌟 Z軸（重ね順）もインデックスに応じて再設定
             Vector3 targetLocalPos = new Vector3(x, y, -0.01f * index);
+
+            // 角度（回転）も残り枚数の位置に合わせてスムーズに補間する
+            float rotationOffset = isEnemy ? 270.0f : 90.0f;
+            card.transform.localRotation = Quaternion.Euler(0, 0, currentAngle - rotationOffset);
 
             // 減った枚数に合わせてキュッと詰める移動
             card.MoveToLocalPositionAsync(targetLocalPos, moveDuration, card.GetCancellationTokenOnDestroy()).Forget();
-
-            index++;
         }
     }
 }
