@@ -1,33 +1,57 @@
-using System.Collections.Generic;
+ï»¿using System.Collections.Generic;
 using UnityEngine;
+using Cysharp.Threading.Tasks;
 
-/// <summary>
-/// èD‚ÌƒJ[ƒh‚Ì’Ç‰ÁE®—ñE‰ñ“]iîŒ`”z’uj‚ğ’S“–‚·‚éƒrƒ…[ƒRƒ“ƒ|[ƒlƒ“ƒg
-/// </summary>
 public class HandView : MonoBehaviour
 {
     [Header("Layout Settings")]
-    [SerializeField] private bool isEnemy = false;    // ƒvƒŒƒCƒ„[—p‚È‚çfalseANPC—p‚È‚çtrue‚É‚·‚é
-    [SerializeField] private float radius = 12.0f;     // ‰~‚Ì”¼Œa
-    [SerializeField] private float angleStep = 5.0f;   // ƒJ[ƒhŠÔ‚ÌŠp“x
+    [SerializeField] private bool isEnemy = false;    // ãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼ç”¨ãªã‚‰falseã€NPCç”¨ãªã‚‰trueã«ã™ã‚‹
+    [SerializeField] private float radius = 12.0f;     // å††ã®åŠå¾„
+    [SerializeField] private float angleStep = 5.0f;   // ã‚«ãƒ¼ãƒ‰é–“ã®è§’åº¦
+
+    [Header("Animation Settings")]
+    [SerializeField] private float moveDuration = 0.4f; // ã¬ã‚‹ã£ã¨å‹•ãæ™‚é–“
 
     /// <summary>
-    /// èD‚ÉƒJ[ƒh‚ğ’Ç‰Á‚µA©“®‚ÅîŒ`‚ÉÄ®—ñ‚³‚¹‚é
+    /// GameManagerå´ï¼ˆDistributeHandCardï¼‰ã‹ã‚‰ã¯ä»Šã¾ã§é€šã‚Šã“ã®å½¢ã§å‘¼ã°ã‚Œã‚‹
     /// </summary>
     public void AddCard(Card card, bool isFaceUp)
     {
         if (card == null) return;
 
-        // ©g‚ÌGameObjectiHandParentj‚ğe‚É‚·‚é
-        card.transform.SetParent(this.transform);
-        card.SetFaceUp(isFaceUp);
+        // å­è¦ç´ ã«ã™ã‚‹å‰ã®ã€Œç¾åœ¨ã®æšæ•°ã€ãŒã€ã“ã®ã‚«ãƒ¼ãƒ‰ã®ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ï¼ˆ0ç•ªç›®ã€œï¼‰
+        int currentCardIndex = this.transform.childCount;
 
-        // ’Ç‰Á‚³‚ê‚½‚Ì‚Å•À‚Ñ‘Ö‚¦‚é
-        Rearrange();
+        card.transform.SetParent(this.transform, worldPositionStays: false);
+        card.SetFaceUp(isFaceUp);
+        card.transform.localPosition = Vector3.zero;
+
+        // ğŸŒŸ ä¿®æ­£ï¼šåˆæœŸé…å¸ƒã®ãƒ«ãƒ¼ãƒ—ä¸­ï¼ˆ8æšæœªæº€ï¼‰ãªã‚‰8æšæƒ³å®šã€ã‚²ãƒ¼ãƒ ä¸­ã®ãƒ‰ãƒ­ãƒ¼ãªã‚‰ç¾åœ¨ã®æšæ•°+1ã§è¨ˆç®—
+        int anticipatedTotal = (currentCardIndex < 8) ? 8 : (currentCardIndex + 1);
+
+        // æ‰‡å½¢é…ç½®ã®è¨ˆç®—
+        float baseAngle = isEnemy ? 270.0f : 90.0f;
+        float centerOffset = (anticipatedTotal - 1) / 2f;
+        float currentAngle = baseAngle + (currentCardIndex - centerOffset) * angleStep * (isEnemy ? 1 : -1);
+        float rad = currentAngle * Mathf.Deg2Rad;
+
+        float x = Mathf.Cos(rad) * radius;
+        float y = (Mathf.Sin(rad) * radius) + (isEnemy ? radius : -radius);
+
+        Vector3 targetLocalPos = new Vector3(x, y, -0.01f * currentCardIndex);
+
+        Vector3 currentLocalPos = card.transform.localPosition;
+        currentLocalPos.z = targetLocalPos.z;
+        card.transform.localPosition = currentLocalPos;
+
+        float rotationOffset = isEnemy ? 270.0f : 90.0f;
+        card.transform.localRotation = Quaternion.Euler(0, 0, currentAngle - rotationOffset);
+
+        card.MoveToLocalPositionAsync(targetLocalPos, moveDuration, card.GetCancellationTokenOnDestroy()).Forget();
     }
 
     /// <summary>
-    /// èD‚É‚ ‚é‘SƒJ[ƒh‚ğæ“¾‚µAŒ»İ‚ÌƒCƒ“ƒfƒbƒNƒX‚ÉŠî‚Ã‚¢‚ÄîŒ`‚É‚«‚ê‚¢‚É•À‚×’¼‚·
+    /// ã‚²ãƒ¼ãƒ ä¸­ã«æœ­ã‚’ãƒ—ãƒ¬ã‚¤ã—ã¦ã€Œæ‰‹æœ­ãŒæ¸›ã£ãŸæ™‚ã€ã«ã€éš™é–“ã‚’ç¶ºéº—ã«è©°ã‚ã‚‹ãŸã‚ã«å‘¼ã³å‡ºã™
     /// </summary>
     public void Rearrange()
     {
@@ -40,24 +64,18 @@ public class HandView : MonoBehaviour
             Card card = child.GetComponent<Card>();
             if (card == null) continue;
 
-            // ƒvƒŒƒCƒ„[‚Í90“xi^ãjA“G‚Í270“xi^‰ºj‚ğŠî€‚É‚·‚é
             float baseAngle = isEnemy ? 270.0f : 90.0f;
-
-            // ’†‰›‚ğŠî€‚ÉîŒ`‚É“WŠJiƒJ[ƒh–‡”‚É‰‚¶‚½’†‰›ƒIƒtƒZƒbƒg‚Í childCount ‚ğƒx[ƒX‚ÉŒvZj
             float centerOffset = (childCount - 1) / 2f;
             float currentAngle = baseAngle + (index - centerOffset) * angleStep * (isEnemy ? 1 : -1);
             float rad = currentAngle * Mathf.Deg2Rad;
 
             float x = Mathf.Cos(rad) * radius;
-            // “G‚Í”¼Œa•ªuãv‚ÖAƒvƒŒƒCƒ„[‚Íu‰ºv‚ÖƒIƒtƒZƒbƒg
             float y = (Mathf.Sin(rad) * radius) + (isEnemy ? radius : -radius);
 
-            // Z²‚ğƒCƒ“ƒfƒbƒNƒX‚É‰‚¶‚Ä‹Í‚©‚É‚¸‚ç‚µAd‚Ë‡‚í‚¹‚Ì•`‰æ‡‚ğ§Œä
-            card.transform.localPosition = new Vector3(x, y, -0.01f * index);
+            Vector3 targetLocalPos = new Vector3(x, y, -0.01f * index);
 
-            // ‰ñ“]F“G‚È‚ç‰º‚ğŒü‚­‚æ‚¤‚É’²®
-            float rotationOffset = isEnemy ? 270.0f : 90.0f;
-            card.transform.localRotation = Quaternion.Euler(0, 0, currentAngle - rotationOffset);
+            // æ¸›ã£ãŸæšæ•°ã«åˆã‚ã›ã¦ã‚­ãƒ¥ãƒƒã¨è©°ã‚ã‚‹ç§»å‹•
+            card.MoveToLocalPositionAsync(targetLocalPos, moveDuration, card.GetCancellationTokenOnDestroy()).Forget();
 
             index++;
         }

@@ -44,12 +44,10 @@ public class GameManager : MonoBehaviour
 
     void Start()
     {
-        // 🌟破棄用トークンの取得
         _destroyToken = this.GetCancellationTokenOnDestroy();
 
         if (koiKoiChoicePanel != null) koiKoiChoicePanel.SetActive(false);
 
-        // スコア記録をリセット
         _playerLastTotalPoints = 0;
         _enemyLastTotalPoints = 0;
 
@@ -57,17 +55,42 @@ public class GameManager : MonoBehaviour
         {
             deckController.InitializeDeck();
         }
+
+        // 1️⃣ ここでカードが内部的にドローされて各Viewの子要素に収まる
         DealInitialCards();
 
         // ゲーム開始時、プレイヤーの最初の手札のエフェクトをチェック
         HighlightMatchableCards();
     }
 
-    void DealInitialCards()
+    // GameManager.cs 内の初期配置を配っている部分
+    private void DealInitialCards()
     {
-        for (int i = 0; i < 8; i++) DistributeFieldCard(true);
-        for (int i = 0; i < 8; i++) DistributeHandCard(playerHandView, true);
-        for (int i = 0; i < 8; i++) DistributeHandCard(enemyHandView, false);
+        int handCount = 8;  // お互いの初期手札は8枚
+        int fieldCount = 8; // 初期場札は8枚
+
+        // 1️⃣ まずはお互いの手札を8枚ずつ交互に配る
+        for (int i = 0; i < handCount; i++)
+        {
+            // プレイヤーへ分配
+            Card playerCard = deckController.DrawCard();
+            playerHandView.AddCard(playerCard, isFaceUp: true);
+
+            // 敵へ分配
+            Card enemyCard = deckController.DrawCard();
+            enemyHandView.AddCard(enemyCard, isFaceUp: false);
+        }
+
+        // 2️⃣ 🌟消えていた場札を配る処理を追加！
+        for (int i = 0; i < fieldCount; i++)
+        {
+            Card fieldCard = deckController.DrawCard();
+            if (fieldView != null)
+            {
+                // 場札は当然、表向き(true)で配置
+                fieldView.AddCard(fieldCard, isFaceUp: true);
+            }
+        }
     }
 
     void DistributeHandCard(HandView targetHand, bool isFaceUp)

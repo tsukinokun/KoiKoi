@@ -119,4 +119,34 @@ public class Card : MonoBehaviour
         transform.position = targetWorldPosition;
         IsMoving = false;
     }
+
+    /// <summary>
+    /// 🌟追加：指定したローカル座標（Local Position）へ滑らかに移動させる非同期関数
+    /// </summary>
+    public async UniTask MoveToLocalPositionAsync(Vector3 targetLocalPosition, float duration, CancellationToken cancellationToken = default)
+    {
+        IsMoving = true;
+        Vector3 startPosition = transform.localPosition; // 💡localPosition を使用
+        float elapsedTime = 0f;
+
+        while (elapsedTime < duration)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            elapsedTime += Time.deltaTime;
+            float t = elapsedTime / duration;
+
+            // イージング（SmoothStep）
+            t = Mathf.SmoothStep(0f, 1f, t);
+
+            // 💡ローカル座標を補間
+            transform.localPosition = Vector3.Lerp(startPosition, targetLocalPosition, t);
+
+            await UniTask.Yield(PlayerLoopTiming.Update, cancellationToken);
+        }
+
+        // 最後に確実に目標のローカル座標に合わせる
+        transform.localPosition = targetLocalPosition;
+        IsMoving = false;
+    }
 }
