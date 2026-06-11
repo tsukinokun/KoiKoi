@@ -330,25 +330,46 @@ public class GameManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 🌟新規非同期メソッド：2枚のカードを札エリアへ滑らかに移動させ、完了したら次のステップ（山札めくり等）を呼ぶ
+    /// 🌟2段階アニメーション：手札を一度場札の右下に重ねて（ペア認識）、そこから獲得エリアへ移動させる
     /// </summary>
     private async UniTask CollectPairAsync(Card handCard, Card fieldCard, bool isPlayer, bool shouldTriggerNextStep = true)
     {
-        // 1. 各自の獲得先Viewの目標位置を取得する
-        // (※現在、各ViewのAddCardが内部で即時座標を確定させていると仮定し、移動先座標を特定します)
+        // --- フェーズ1: 手札（または山札）を、対象の場札の右下に重ねる ---
+        if (handCard != null && fieldCard != null)
+        {
+            // 重ねるために一時的に親を fieldView に合わせる（worldPositionStaysはtrueでワープ防止）
+            handCard.transform.SetParent(fieldView.transform, worldPositionStays: true);
+
+            // 選択状態や光をリセット
+            handCard.SetSelected(false);
+            handCard.SetGlow(false);
+            handCard.SetFaceUp(true);
+
+            // 場札のローカル座標を基準に、少し「右下（X+0.15f, Y-0.15f）」かつ「手前（Z-0.05f）」の位置を計算
+            Vector3 fieldLocalPos = fieldCard.transform.localPosition;
+            Vector3 overlapTargetPos = new Vector3(fieldLocalPos.x + 0.15f, fieldLocalPos.y - 0.15f, fieldLocalPos.z - 0.05f);
+
+            // 場札の回転に合わせる（基本は正面ですが、場札に傾きがある場合の保険）
+            handCard.transform.localRotation = fieldCard.transform.localRotation;
+
+            // まず、場札の右下へ滑り込ませる（演出時間は仮に0.25秒）
+            float overlapDuration = 0.25f;
+            handCard.MoveToLocalPositionAsync(overlapTargetPos, overlapDuration, handCard.GetCancellationTokenOnDestroy()).Forget();
+
+            // 重なるまで少し待つ（「カツッ」と重なるタメの時間として 0.3秒）
+            await UniTask.Delay(TimeSpan.FromSeconds(overlapDuration + 0.05f), cancellationToken: _destroyToken);
+        }
+
+        // --- フェーズ2: ペアが成立したので、2枚同時に獲得エリアへ送る ---
         CapturedAreaView targetCapturedView = isPlayer ? playerCapturedView : enemyCapturedView;
 
-        // 💡もしAddCardする前に移動させたい場合、一旦AddCardを呼び出して配置先を確定させてから
-        // 元の座標に戻してスライドさせる（手順2のアプローチ）を行います。
-
-        // 現状は安全に、移動処理を並行して実行して完了を待ちます
-        // (各ViewのAddCardの中で即時SetParentされてジャンプしている場合、View側を後述のように調整するとより綺麗になります)
+        // 獲得エリアへの移動を開始（ここで親子関係が各カテゴリーに切り替わり、ぬるっと移動する）
         MoveToCapturedArea(handCard, isPlayer);
         MoveToCapturedArea(fieldCard, isPlayer);
 
-        // 🌟演出時間を仮に 0.4 秒として、2枚同時に移動完了するのをきっちり待つ
-        // (もし Card.MoveToPositionAsync を直接 await する場合は、View側の即時配置と競合しないよう調整が必要です)
-        await UniTask.Delay(TimeSpan.FromSeconds(0.4f), cancellationToken: _destroyToken);
+        // CapturedAreaView 側での移動完了を待つ（0.4秒）
+        float duration = (targetCapturedView != null) ? targetCapturedView.MoveDuration : 0.4f;
+        await UniTask.Delay(TimeSpan.FromSeconds(duration), cancellationToken: _destroyToken);
 
         // 次のステップに進むフラグがON（手札からペアを取った時など）であれば山札めくりへ
         if (shouldTriggerNextStep)
@@ -357,8 +378,11 @@ public class GameManager : MonoBehaviour
         }
     }
 
+    // MoveToCapturedArea はシンプルに受け渡すだけに整理
     void MoveToCapturedArea(Card card, bool isPlayer)
     {
+        if (card == null) return;
+
         card.SetSelected(false);
         card.SetFaceUp(true);
         card.SetGlow(false);
