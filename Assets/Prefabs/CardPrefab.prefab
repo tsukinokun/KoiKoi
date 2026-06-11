@@ -104,7 +104,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 30445074672cf0846b9e81a7a567d256, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CardGlowEffect
-  fadeSpeed: 2
+  fadeSpeed: 1
   maxAlpha: 1
   minAlpha: 0
 --- !u!1 &3403582605777476612

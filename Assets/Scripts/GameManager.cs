@@ -82,30 +82,99 @@ public class GameManager : MonoBehaviour
 
         Transform currentParent = clickedCard.transform.parent;
 
+        // --- 1. プレイヤーの手札がクリックされた場合 ---
         if (playerHandView != null && currentParent == playerHandView.transform)
         {
+            // すでに選択されている手札を「もう一度クリック」した場合（今回の修正コア）
             if (_currentSelectedCard == clickedCard)
             {
-                _currentSelectedCard = null;
-                clickedCard.SetSelected(false);
+                // 場札から同じ月のカードをすべてリストアップする
+                List<Card> matchingFieldCards = new List<Card>();
+                if (fieldView != null)
+                {
+                    foreach (Transform fieldCardTr in fieldView.transform)
+                    {
+                        Card fieldCard = fieldCardTr.GetComponent<Card>();
+                        if (fieldCard != null && fieldCard.Data != null && fieldCard.Data.month == clickedCard.Data.month)
+                        {
+                            matchingFieldCards.Add(fieldCard);
+                        }
+                    }
+                }
 
-                if (fieldView != null) fieldView.AddCard(clickedCard, true);
-                playerHandView.Rearrange();
+                // パターンA：取れるカードが「1枚だけ」の場合 → 自動でそのカードを取る
+                if (matchingFieldCards.Count == 1)
+                {
+                    Card hand = _currentSelectedCard;
+                    Card field = matchingFieldCards[0];
 
-                clickedCard.SetGlow(false);
+                    // 選択状態を解除
+                    hand.SetSelected(false);
+                    _currentSelectedCard = null;
 
-                // 🌟プレイヤーの「思考（選択）」が終了したため、即座に手札の光をすべて切る
-                ClearAllHandGlows();
+                    // ペアを獲得
+                    CollectPair(hand, field, true);
 
-                StartCoroutine(DrawFromDeckRoutine(true));
+                    if (playerHandView != null) playerHandView.Rearrange();
+                    ClearAllHandGlows();
+                    StartCoroutine(DrawFromDeckRoutine(true));
+                }
+                // パターンB：取れるカードが「2枚以上」の場合 → 場札の該当カードを光らせて、クリックを待つ
+                else if (matchingFieldCards.Count >= 2)
+                {
+                    Debug.Log($"取れるカードが {matchingFieldCards.Count} 枚あります。場札を選択してください。");
+
+                    // 一旦すべての場札の光を消してから、対象のカードだけを光らせる
+                    foreach (Transform fieldCardTr in fieldView.transform)
+                    {
+                        Card fc = fieldCardTr.GetComponent<Card>();
+                        if (fc != null) fc.SetGlow(false);
+                    }
+                    foreach (Card fc in matchingFieldCards)
+                    {
+                        fc.SetGlow(true); // 取得可能な場札を光らせる
+                    }
+
+                    // 手札の選択状態は維持したまま、メソッドを抜けて場札のクリックを待つ
+                }
+                // パターンC：取れるカードが「ない」場合 → そのまま場札として出す
+                else
+                {
+                    Debug.Log("取れるカードがないため、場札として出します。");
+                    _currentSelectedCard = null;
+                    clickedCard.SetSelected(false);
+
+                    if (fieldView != null) fieldView.AddCard(clickedCard, true);
+                    playerHandView.Rearrange();
+
+                    clickedCard.SetGlow(false);
+                    ClearAllHandGlows();
+
+                    StartCoroutine(DrawFromDeckRoutine(true));
+                }
                 return;
             }
 
+            // まだ何も選択していない、または別の手札を選択した場合
             if (_currentSelectedCard != null) _currentSelectedCard.SetSelected(false);
 
             _currentSelectedCard = clickedCard;
             _currentSelectedCard.SetSelected(true);
+
+            // 【親切設計】手札を1回クリックした時点で、どの場札が取れるかを光らせる
+            if (fieldView != null)
+            {
+                foreach (Transform fieldCardTr in fieldView.transform)
+                {
+                    Card fc = fieldCardTr.GetComponent<Card>();
+                    if (fc != null && fc.Data != null)
+                    {
+                        fc.SetGlow(fc.Data.month == clickedCard.Data.month);
+                    }
+                }
+            }
         }
+        // --- 2. 選択中に場札がクリックされた場合 ---
         else if (fieldView != null && currentParent == fieldView.transform && _currentSelectedCard != null)
         {
             if (_currentSelectedCard.Data == null)
@@ -115,6 +184,7 @@ public class GameManager : MonoBehaviour
                 return;
             }
 
+            // クリックした場札が、選択中の手札と同じ月の場合のみ獲得
             if (_currentSelectedCard.Data.month == clickedCard.Data.month)
             {
                 Card hand = _currentSelectedCard;
@@ -125,7 +195,12 @@ public class GameManager : MonoBehaviour
 
                 if (playerHandView != null) playerHandView.Rearrange();
 
-                // 🌟札を合わせて獲得し、プレイヤーの「思考」が終了したため、即座に手札の光をすべて切る
+                // 場札の光をすべてリセット
+                foreach (Transform fieldCardTr in fieldView.transform)
+                {
+                    Card fc = fieldCardTr.GetComponent<Card>();
+                    if (fc != null) fc.SetGlow(false);
+                }
                 ClearAllHandGlows();
 
                 StartCoroutine(DrawFromDeckRoutine(true));
