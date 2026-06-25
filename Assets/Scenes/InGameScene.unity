@@ -480,6 +480,8 @@ MonoBehaviour:
   enemyCapturedView: {fileID: 562295284}
   yakuWindowManager: {fileID: 199974964}
   koiKoiChoicePanel: {fileID: 1404467165}
+  gameBgmClip: {fileID: 8300000, guid: e35ef31b026c5c34b8dd1f4ee0663a3f, type: 3}
+  bgmVolume: 0.2
   playerKoiKoiClip: {fileID: 8300000, guid: aa2ffc8bca1d4494785240cb17622826, type: 3}
   playerAgariClip: {fileID: 8300000, guid: 538308adb22ae3040abca26ac96e22ae, type: 3}
   enemyKoiKoiClip: {fileID: 8300000, guid: 1345be3302f3ed04f9df4c23802d1bda, type: 3}

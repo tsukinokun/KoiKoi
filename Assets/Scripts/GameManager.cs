@@ -31,6 +31,11 @@ public class GameManager : MonoBehaviour
     [Header("Koi-Koi UI")]
     [SerializeField] private GameObject koiKoiChoicePanel;
 
+    // BGM用の設定
+    [Header("Audio Settings (BGM)")]
+    [SerializeField] private AudioClip gameBgmClip;      // 流したいBGMのクリップ
+    [Range(0f, 1f)][SerializeField] private float bgmVolume = 0.2f; // BGMの音量調整
+
     // オーディオクリップ登録用
     [Header("Audio Settings (Player)")]
     [SerializeField] private AudioClip playerKoiKoiClip;
@@ -41,6 +46,7 @@ public class GameManager : MonoBehaviour
     [SerializeField] private AudioClip enemyAgariClip;
 
     private AudioSource _audioSource; // 内部再生用コンポーネント
+    private AudioSource _bgmAudioSource;
 
     // 次のターンへ進むためのコールバック保持用
     private System.Action _onFlowCompleteCallback;
@@ -56,16 +62,24 @@ public class GameManager : MonoBehaviour
 
     private void Awake()
     {
-        // 再生用のAudioSourceコンポーネントを確保（無ければ自動追加してバグを防ぐ）
+        // 1️⃣ ボイス・SE用のAudioSourceを確保
         _audioSource = GetComponent<AudioSource>();
         if (_audioSource == null)
         {
             _audioSource = gameObject.AddComponent<AudioSource>();
         }
-
-        // UIやボイス用なので、2Dサウンドとして確実に聞こえるように設定
         _audioSource.spatialBlend = 0f;
         _audioSource.playOnAwake = false;
+
+        // 2️⃣ 🌟 BGM専用のAudioSourceを追加してセットアップ
+        _bgmAudioSource = gameObject.AddComponent<AudioSource>();
+        _bgmAudioSource.spatialBlend = 0f;
+        _bgmAudioSource.loop = true;          // BGMなのでループ再生を有効に
+        _bgmAudioSource.playOnAwake = false;   // 管理をコード側で行うため一旦false
+        _bgmAudioSource.volume = bgmVolume;
+
+        // 🌟 BGMの再生を開始
+        PlayBGM(gameBgmClip);
     }
 
     void Start()
@@ -721,5 +735,13 @@ public class GameManager : MonoBehaviour
             _audioSource.Stop();
             _audioSource.PlayOneShot(clip);
         }
+    }
+
+    private void PlayBGM(AudioClip clip)
+    {
+        if (_bgmAudioSource == null || clip == null) return;
+
+        _bgmAudioSource.clip = clip;
+        _bgmAudioSource.Play();
     }
 }
