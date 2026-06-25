@@ -31,6 +31,17 @@ public class GameManager : MonoBehaviour
     [Header("Koi-Koi UI")]
     [SerializeField] private GameObject koiKoiChoicePanel;
 
+    // オーディオクリップ登録用
+    [Header("Audio Settings (Player)")]
+    [SerializeField] private AudioClip playerKoiKoiClip;
+    [SerializeField] private AudioClip playerAgariClip;
+
+    [Header("Audio Settings (Enemy/NPC)")]
+    [SerializeField] private AudioClip enemyKoiKoiClip;
+    [SerializeField] private AudioClip enemyAgariClip;
+
+    private AudioSource _audioSource; // 内部再生用コンポーネント
+
     // 次のターンへ進むためのコールバック保持用
     private System.Action _onFlowCompleteCallback;
 
@@ -42,6 +53,20 @@ public class GameManager : MonoBehaviour
 
     // オブジェクトが破棄された時に非同期処理を安全に止めるためのトークン
     private CancellationToken _destroyToken;
+
+    private void Awake()
+    {
+        // 再生用のAudioSourceコンポーネントを確保（無ければ自動追加してバグを防ぐ）
+        _audioSource = GetComponent<AudioSource>();
+        if (_audioSource == null)
+        {
+            _audioSource = gameObject.AddComponent<AudioSource>();
+        }
+
+        // UIやボイス用なので、2Dサウンドとして確実に聞こえるように設定
+        _audioSource.spatialBlend = 0f;
+        _audioSource.playOnAwake = false;
+    }
 
     void Start()
     {
@@ -112,7 +137,7 @@ public class GameManager : MonoBehaviour
 
         Transform currentParent = clickedCard.transform.parent;
 
-        // --- 1. プレイヤーの手札がクリックされた場合 ---
+        // --- プレイヤーの手札がクリックされた場合 ---
         if (playerHandView != null && currentParent == playerHandView.transform)
         {
             // すでに選択されている手札を「もう一度クリック」した場合
@@ -131,7 +156,7 @@ public class GameManager : MonoBehaviour
             // 【親切設計】手札を1回クリックした時点で、どの場札が取れるかを光らせる
             HighlightMatchingFieldCards(clickedCard.Data.month);
         }
-        // --- 2. 選択中に場札がクリックされた場合 ---
+        // --- 選択中に場札がクリックされた場合 ---
         else if (fieldView != null && currentParent == fieldView.transform && _currentSelectedCard != null)
         {
             if (_currentSelectedCard.Data == null)
@@ -509,6 +534,7 @@ public class GameManager : MonoBehaviour
                     }
                     else
                     {
+                        PlayVoice(enemyAgariClip);
                         Debug.Log("NPCが役を更新しました。勝負あり！");
                         OnGameEnd(false);
                     }
@@ -543,6 +569,8 @@ public class GameManager : MonoBehaviour
     public void OnKoiKoiSelected()
     {
         Debug.Log("こいこい！勝負を続行します。");
+
+        PlayVoice(playerKoiKoiClip);
         if (koiKoiChoicePanel != null) koiKoiChoicePanel.SetActive(false);
 
         _playerLastTotalPoints = _tempCurrentPoints;
@@ -554,6 +582,7 @@ public class GameManager : MonoBehaviour
     public void OnAgariSelected()
     {
         Debug.Log("勝負！ここで上がりです。");
+        PlayVoice(playerAgariClip);
         if (koiKoiChoicePanel != null) koiKoiChoicePanel.SetActive(false);
 
         OnGameEnd(true);
@@ -680,6 +709,17 @@ public class GameManager : MonoBehaviour
             {
                 handCard.SetGlow(false);
             }
+        }
+    }
+
+    /// 指定されたオーディオクリップを安全に再生するヘルパー関数
+    private void PlayVoice(AudioClip clip)
+    {
+        if (_audioSource != null && clip != null)
+        {
+            // 他の音声と重なってブツ切りにならないよう、現在再生中のものを停止してから鳴らす
+            _audioSource.Stop();
+            _audioSource.PlayOneShot(clip);
         }
     }
 }
