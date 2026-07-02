@@ -34,7 +34,10 @@ public class GameManager : MonoBehaviour
     // BGM用の設定
     [Header("Audio Settings (BGM)")]
     [SerializeField] private AudioClip gameBgmClip;      // 流したいBGMのクリップ
-    [Range(0f, 1f)][SerializeField] private float bgmVolume = 0.2f; // BGMの音量調整
+    [Range(0f, 1f)][SerializeField] private float bgmVolume = 0.1f; // BGMの音量調整
+
+    [Header("Audio Settings (Volume)")]
+    [Range(0f, 1f)][SerializeField] private float seVolume = 1.0f; // ボイス/SEの音量
 
     // オーディオクリップ登録用
     [Header("Audio Settings (Player)")]
@@ -44,6 +47,10 @@ public class GameManager : MonoBehaviour
     [Header("Audio Settings (Enemy/NPC)")]
     [SerializeField] private AudioClip enemyKoiKoiClip;
     [SerializeField] private AudioClip enemyAgariClip;
+
+    [Header("Audio Settings (Voices)")]
+    [SerializeField] private List<AudioClip> playerVoiceClips; // プレイヤー用の掛け声3種
+    [SerializeField] private List<AudioClip> enemyVoiceClips;  // NPC用の掛け声3種
 
     private AudioSource _audioSource; // 内部再生用コンポーネント
     private AudioSource _bgmAudioSource;
@@ -157,6 +164,8 @@ public class GameManager : MonoBehaviour
             // すでに選択されている手札を「もう一度クリック」した場合
             if (_currentSelectedCard == clickedCard)
             {
+                // 掛け声
+                PlayRandomVoice(playerVoiceClips);
                 ExecuteAutoCapture(clickedCard);
                 return;
             }
@@ -183,6 +192,9 @@ public class GameManager : MonoBehaviour
             // クリックした場札が、選択中の手札と同じ月の場合のみ獲得
             if (_currentSelectedCard.Data.month == clickedCard.Data.month)
             {
+                // 掛け声
+                PlayRandomVoice(playerVoiceClips);
+
                 Card hand = _currentSelectedCard;
                 _currentSelectedCard = null;
 
@@ -640,6 +652,7 @@ public class GameManager : MonoBehaviour
 
         if (npcChoice != null && fieldChoices.Count > 0)
         {
+            PlayRandomVoice(enemyVoiceClips);
             // 🌟 NPCの処理も3枚場に出ている時は総取りルーチンへ分岐させる
             if (fieldChoices.Count == 3)
             {
@@ -654,6 +667,7 @@ public class GameManager : MonoBehaviour
         {
             if (enemyHandView != null && enemyHandView.transform.childCount > 0)
             {
+                PlayRandomVoice(enemyVoiceClips);
                 Card discard = enemyHandView.transform.GetChild(0).GetComponent<Card>();
                 if (fieldView != null) fieldView.AddCard(discard, true);
 
@@ -731,7 +745,7 @@ public class GameManager : MonoBehaviour
     {
         if (_audioSource != null && clip != null)
         {
-            // 他の音声と重なってブツ切りにならないよう、現在再生中のものを停止してから鳴らす
+            _audioSource.volume = seVolume; // ここで音量を適用する
             _audioSource.Stop();
             _audioSource.PlayOneShot(clip);
         }
@@ -743,5 +757,14 @@ public class GameManager : MonoBehaviour
 
         _bgmAudioSource.clip = clip;
         _bgmAudioSource.Play();
+    }
+
+    private void PlayRandomVoice(List<AudioClip> clips)
+    {
+        if (clips != null && clips.Count > 0)
+        {
+            AudioClip clip = clips[UnityEngine.Random.Range(0, clips.Count)];
+            PlayVoice(clip);
+        }
     }
 }

@@ -482,10 +482,19 @@ MonoBehaviour:
   koiKoiChoicePanel: {fileID: 1404467165}
   gameBgmClip: {fileID: 8300000, guid: e35ef31b026c5c34b8dd1f4ee0663a3f, type: 3}
   bgmVolume: 0.2
-  playerKoiKoiClip: {fileID: 8300000, guid: aa2ffc8bca1d4494785240cb17622826, type: 3}
-  playerAgariClip: {fileID: 8300000, guid: 538308adb22ae3040abca26ac96e22ae, type: 3}
+  seVolume: 1
+  playerKoiKoiClip: {fileID: 8300000, guid: 43858da77a975b24ba939edead7cb95f, type: 3}
+  playerAgariClip: {fileID: 8300000, guid: 1577b6f211d43cd48b1475804d6d008f, type: 3}
   enemyKoiKoiClip: {fileID: 8300000, guid: 1345be3302f3ed04f9df4c23802d1bda, type: 3}
   enemyAgariClip: {fileID: 8300000, guid: f8a4b59fb51eaa444b4bedf303262965, type: 3}
+  playerVoiceClips:
+  - {fileID: 8300000, guid: d0361a1ab73dfab469a6b0c035a7780f, type: 3}
+  - {fileID: 8300000, guid: 33684580a218afe449f63314b12213ab, type: 3}
+  - {fileID: 8300000, guid: 6bf6bfadf0c410e4fa06007cc9f28298, type: 3}
+  enemyVoiceClips:
+  - {fileID: 8300000, guid: c8e0b8626e3668344be6698b0b3fbab7, type: 3}
+  - {fileID: 8300000, guid: 694c462f0dcc3fc4fbb6d1401bf30100, type: 3}
+  - {fileID: 8300000, guid: 2a070e1e5d52a75428f6762a1f7303e3, type: 3}
 --- !u!4 &352264725
 Transform:
   m_ObjectHideFlags: 0
