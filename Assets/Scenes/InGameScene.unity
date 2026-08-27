@@ -495,6 +495,8 @@ MonoBehaviour:
   - {fileID: 8300000, guid: c8e0b8626e3668344be6698b0b3fbab7, type: 3}
   - {fileID: 8300000, guid: 694c462f0dcc3fc4fbb6d1401bf30100, type: 3}
   - {fileID: 8300000, guid: 2a070e1e5d52a75428f6762a1f7303e3, type: 3}
+  cutInEffectObject: {fileID: 2062322571}
+  cutInAnimator: {fileID: 2062322572}
 --- !u!4 &352264725
 Transform:
   m_ObjectHideFlags: 0
@@ -2443,7 +2445,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!95 &2062322572
 Animator:
   serializedVersion: 7
@@ -2513,7 +2515,7 @@ SpriteRenderer:
   m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: 0
+  m_SortingOrder: 100
   m_MaskInteraction: 0
   m_Sprite: {fileID: 2505925020465219474, guid: c5022e0e3e1ce4d4a95185784093049b, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}

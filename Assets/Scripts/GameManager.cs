@@ -52,6 +52,9 @@ public class GameManager : MonoBehaviour
     [SerializeField] private List<AudioClip> playerVoiceClips; // プレイヤー用の掛け声3種
     [SerializeField] private List<AudioClip> enemyVoiceClips;  // NPC用の掛け声3種
 
+    [Header("CutIn Animation")]
+    [SerializeField] private GameObject cutInEffectObject; // 🌟 BlueCutInEffectBack の GameObject をアタッチ
+    [SerializeField] private Animator cutInAnimator;         // Animatorをアタッチ
     private AudioSource _audioSource; // 内部再生用コンポーネント
     private AudioSource _bgmAudioSource;
 
@@ -551,19 +554,11 @@ public class GameManager : MonoBehaviour
 
             if (yakuWindowManager != null)
             {
+                // 1️⃣ 役成立ウィンドウを表示
                 yakuWindowManager.ShowYaku(combinedName, currentTotalPoints, () =>
                 {
-                    if (isPlayer)
-                    {
-                        _onFlowCompleteCallback = onComplete;
-                        OpenKoiKoiWindow(currentTotalPoints);
-                    }
-                    else
-                    {
-                        PlayVoice(enemyAgariClip);
-                        Debug.Log("NPCが役を更新しました。勝負あり！");
-                        OnGameEnd(false);
-                    }
+                    // 2️⃣ ここでカットインや役成立のアニメーションを再生・待機させる
+                    PlayYakuAnimationAndProceed(isPlayer, currentTotalPoints, onComplete).Forget();
                 });
             }
             else
@@ -574,6 +569,44 @@ public class GameManager : MonoBehaviour
         else
         {
             onComplete?.Invoke();
+        }
+    }
+
+    /// <summary>
+    /// 🌟 役成立時のアニメーション待機と、その後のこいこい判定・ゲーム終了フロー
+    /// </summary>
+    private async UniTaskVoid PlayYakuAnimationAndProceed(bool isPlayer, int currentTotalPoints, System.Action onComplete)
+    {
+        if (cutInEffectObject != null)
+        {
+            cutInEffectObject.SetActive(true);
+        }
+
+        if (cutInAnimator != null)
+        {
+            cutInAnimator.SetTrigger("PlayCutIn");
+        }
+
+        // 🌟 イントロ＋ループ＋アウトロを合わせた総再生時間（秒）だけ待機
+        // 例: 合計が 2.5 秒の場合
+        await UniTask.Delay(TimeSpan.FromSeconds(2.5f), cancellationToken: _destroyToken);
+
+        // 🌟 再生が終わったら非表示に戻す
+        if (cutInEffectObject != null)
+        {
+            cutInEffectObject.SetActive(false);
+        }
+
+        if (isPlayer)
+        {
+            _onFlowCompleteCallback = onComplete;
+            OpenKoiKoiWindow(currentTotalPoints);
+        }
+        else
+        {
+            PlayVoice(enemyAgariClip);
+            Debug.Log("NPCが役を更新しました。勝負あり！");
+            OnGameEnd(false);
         }
     }
 
