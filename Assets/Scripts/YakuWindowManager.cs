@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Text;
 using UnityEngine;
 using UnityEngine.UI; // ★標準Textコンポーネントを扱うために必須
 
@@ -50,6 +52,38 @@ public class YakuWindowManager : MonoBehaviour
         _onCloseCallback = onClose;
 
         // ウィンドウをアクティブにする
+        windowRoot.SetActive(true);
+    }
+
+    /// <summary>
+    /// 成立した役をすべてまとめて一括表示する
+    /// </summary>
+    public void ShowYakuList(List<YakuResult> yakuResults, Action onClose)
+    {
+        if (windowRoot == null || yakuNameText == null)
+        {
+            Debug.LogError("YakuWindowManager: 必要なUIコンポーネントがアサインされていません。");
+            onClose?.Invoke();
+            return;
+        }
+
+        int totalPoints = 0;
+        var sb = new StringBuilder();
+        for (int i = 0; i < yakuResults.Count; i++)
+        {
+            YakuResult yaku = yakuResults[i];
+            totalPoints += yaku.Points;
+            sb.Append(pointText != null ? yaku.Name : $"{yaku.Name}  {yaku.Points} 文");
+            if (i < yakuResults.Count - 1) sb.Append("\n");
+        }
+
+        yakuNameText.text = sb.ToString();
+        if (pointText != null)
+        {
+            pointText.text = totalPoints + " 文";
+        }
+
+        _onCloseCallback = onClose;
         windowRoot.SetActive(true);
     }
 

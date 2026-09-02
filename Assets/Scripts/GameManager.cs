@@ -30,6 +30,7 @@ public class GameManager : MonoBehaviour
     [Header("Presentation")]
     [SerializeField] private AudioManager audioManager;
     [SerializeField] private CutInPresenter cutInPresenter;
+    [SerializeField] private YakuWindowManager yakuWindowManager;
 
     [Header("Initial Deal Settings")]
     [SerializeField] private int initialHandCount = 8;  // お互いの初期手札枚数
@@ -453,6 +454,13 @@ public class GameManager : MonoBehaviour
         if (cutInPresenter != null)
         {
             await cutInPresenter.PlayVictoryAsync(isPlayer, activeYakus, _destroyToken);
+        }
+
+        if (yakuWindowManager != null)
+        {
+            var tcs = new UniTaskCompletionSource();
+            yakuWindowManager.ShowYakuList(activeYakus, () => tcs.TrySetResult());
+            await tcs.Task;
         }
 
         if (isPlayer)
