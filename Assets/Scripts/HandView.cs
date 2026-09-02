@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using Cysharp.Threading.Tasks;
 
@@ -8,9 +9,17 @@ public class HandView : MonoBehaviour
     [SerializeField] private bool isEnemy = false;    // プレイヤー用ならfalse、NPC用ならtrueにする
     [SerializeField] private float radius = 12.0f;     // 円の半径
     [SerializeField] private float angleStep = 5.0f;   // カード間の角度
+    [SerializeField] private int initialHandCount = 8; // 初期配布時に想定する手札枚数（扇の中心を決めるため）
 
     [Header("Animation Settings")]
     [SerializeField] private float moveDuration = 0.2f; // ぬるっと動く時間
+
+    /// <summary>
+    /// このビューが持つカードのうちデータを保持しているものを列挙する
+    /// </summary>
+    public IEnumerable<Card> Cards => transform.Cast<Transform>()
+        .Select(t => t.GetComponent<Card>())
+        .Where(c => c != null && c.Data != null);
 
     /// <summary>
     /// GameManager側（DistributeHandCard）からは今まで通りこの形で呼ばれる
@@ -26,26 +35,15 @@ public class HandView : MonoBehaviour
         card.SetFaceUp(isFaceUp);
         card.transform.localPosition = Vector3.zero;
 
-        // 🌟 修正：初期配布のループ中（8枚未満）なら8枚想定、ゲーム中のドローなら現在の枚数+1で計算
-        int anticipatedTotal = (currentCardIndex < 8) ? 8 : (currentCardIndex + 1);
+        // 初期配布のループ中（initialHandCount枚未満）ならinitialHandCount枚想定、ゲーム中のドローなら現在の枚数+1で計算
+        int anticipatedTotal = (currentCardIndex < initialHandCount) ? initialHandCount : (currentCardIndex + 1);
 
-        // 扇形配置の計算
-        float baseAngle = isEnemy ? 270.0f : 90.0f;
-        float centerOffset = (anticipatedTotal - 1) / 2f;
-        float currentAngle = baseAngle + (currentCardIndex - centerOffset) * angleStep * (isEnemy ? 1 : -1);
-        float rad = currentAngle * Mathf.Deg2Rad;
-
-        float x = Mathf.Cos(rad) * radius;
-        float y = (Mathf.Sin(rad) * radius) + (isEnemy ? radius : -radius);
-
-        Vector3 targetLocalPos = new Vector3(x, y, -0.01f * currentCardIndex);
+        (Vector3 targetLocalPos, Quaternion targetRotation) = CalculateSlot(currentCardIndex, anticipatedTotal);
 
         Vector3 currentLocalPos = card.transform.localPosition;
         currentLocalPos.z = targetLocalPos.z;
         card.transform.localPosition = currentLocalPos;
-
-        float rotationOffset = isEnemy ? 270.0f : 90.0f;
-        card.transform.localRotation = Quaternion.Euler(0, 0, currentAngle - rotationOffset);
+        card.transform.localRotation = targetRotation;
 
         card.MoveToLocalPositionAsync(targetLocalPos, moveDuration, card.GetCancellationTokenOnDestroy()).Forget();
     }
@@ -53,21 +51,14 @@ public class HandView : MonoBehaviour
     /// <summary>
     /// ゲーム中に札をプレイして「手札が減った時」に、隙間を綺麗に詰めるために呼び出す
     /// </summary>
-    // 🌟 修正：除外したいカード（出したカード）を引数で受け取れるようにする（デフォルトはnull）
+    // 🌟 除外したいカード（出したカード）を引数で受け取れるようにする（デフォルトはnull）
     public void Rearrange(Card ignoreCard = null)
     {
         // 1️⃣ 実際に残る有効なカードだけをリスト化する
-        List<Card> activeCards = new List<Card>();
-        foreach (Transform child in this.transform)
-        {
-            Card card = child.GetComponent<Card>();
-            if (card == null) continue;
-
-            // 出したカード、または非アクティブなカードは除外
-            if (card == ignoreCard || !card.gameObject.activeSelf) continue;
-
-            activeCards.Add(card);
-        }
+        List<Card> activeCards = transform.Cast<Transform>()
+            .Select(t => t.GetComponent<Card>())
+            .Where(card => card != null && card != ignoreCard && card.gameObject.activeSelf)
+            .ToList();
 
         int activeCount = activeCards.Count;
         if (activeCount == 0) return;
@@ -77,25 +68,33 @@ public class HandView : MonoBehaviour
         {
             Card card = activeCards[index];
 
-            float baseAngle = isEnemy ? 270.0f : 90.0f;
+            (Vector3 targetLocalPos, Quaternion targetRotation) = CalculateSlot(index, activeCount);
 
-            // 🌟 childCount ではなく、確定した残り枚数（activeCount）を使う
-            float centerOffset = (activeCount - 1) / 2f;
-            float currentAngle = baseAngle + (index - centerOffset) * angleStep * (isEnemy ? 1 : -1);
-            float rad = currentAngle * Mathf.Deg2Rad;
-
-            float x = Mathf.Cos(rad) * radius;
-            float y = (Mathf.Sin(rad) * radius) + (isEnemy ? radius : -radius);
-
-            // 🌟 Z軸（重ね順）もインデックスに応じて再設定
-            Vector3 targetLocalPos = new Vector3(x, y, -0.01f * index);
-
-            // 角度（回転）も残り枚数の位置に合わせてスムーズに補間する
-            float rotationOffset = isEnemy ? 270.0f : 90.0f;
-            card.transform.localRotation = Quaternion.Euler(0, 0, currentAngle - rotationOffset);
+            card.transform.localRotation = targetRotation;
 
             // 減った枚数に合わせてキュッと詰める移動
             card.MoveToLocalPositionAsync(targetLocalPos, moveDuration, card.GetCancellationTokenOnDestroy()).Forget();
         }
+    }
+
+    /// <summary>
+    /// 扇形配置における、指定インデックス（全体枚数total中のindex番目）のローカル座標と回転を計算する
+    /// </summary>
+    private (Vector3 localPosition, Quaternion rotation) CalculateSlot(int index, int total)
+    {
+        float baseAngle = isEnemy ? 270.0f : 90.0f;
+        float centerOffset = (total - 1) / 2f;
+        float currentAngle = baseAngle + (index - centerOffset) * angleStep * (isEnemy ? 1 : -1);
+        float rad = currentAngle * Mathf.Deg2Rad;
+
+        float x = Mathf.Cos(rad) * radius;
+        float y = (Mathf.Sin(rad) * radius) + (isEnemy ? radius : -radius);
+
+        Vector3 localPosition = new Vector3(x, y, -0.01f * index);
+
+        float rotationOffset = isEnemy ? 270.0f : 90.0f;
+        Quaternion rotation = Quaternion.Euler(0, 0, currentAngle - rotationOffset);
+
+        return (localPosition, rotation);
     }
 }

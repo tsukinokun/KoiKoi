@@ -453,6 +453,8 @@ GameObject:
   - component: {fileID: 352264725}
   - component: {fileID: 352264724}
   - component: {fileID: 352264726}
+  - component: {fileID: 352264727}
+  - component: {fileID: 352264728}
   m_Layer: 0
   m_Name: GameManager
   m_TagString: Untagged
@@ -480,23 +482,8 @@ MonoBehaviour:
   enemyCapturedView: {fileID: 562295284}
   yakuWindowManager: {fileID: 199974964}
   koiKoiChoicePanel: {fileID: 1404467165}
-  gameBgmClip: {fileID: 8300000, guid: e35ef31b026c5c34b8dd1f4ee0663a3f, type: 3}
-  bgmVolume: 0.2
-  seVolume: 1
-  playerKoiKoiClip: {fileID: 8300000, guid: 43858da77a975b24ba939edead7cb95f, type: 3}
-  playerAgariClip: {fileID: 8300000, guid: 1577b6f211d43cd48b1475804d6d008f, type: 3}
-  enemyKoiKoiClip: {fileID: 8300000, guid: 1345be3302f3ed04f9df4c23802d1bda, type: 3}
-  enemyAgariClip: {fileID: 8300000, guid: f8a4b59fb51eaa444b4bedf303262965, type: 3}
-  playerVoiceClips:
-  - {fileID: 8300000, guid: d0361a1ab73dfab469a6b0c035a7780f, type: 3}
-  - {fileID: 8300000, guid: 33684580a218afe449f63314b12213ab, type: 3}
-  - {fileID: 8300000, guid: 6bf6bfadf0c410e4fa06007cc9f28298, type: 3}
-  enemyVoiceClips:
-  - {fileID: 8300000, guid: c8e0b8626e3668344be6698b0b3fbab7, type: 3}
-  - {fileID: 8300000, guid: 694c462f0dcc3fc4fbb6d1401bf30100, type: 3}
-  - {fileID: 8300000, guid: 2a070e1e5d52a75428f6762a1f7303e3, type: 3}
-  cutInEffectObject: {fileID: 2062322571}
-  cutInAnimator: {fileID: 2062322572}
+  audioManager: {fileID: 352264727}
+  cutInPresenter: {fileID: 352264728}
 --- !u!4 &352264725
 Transform:
   m_ObjectHideFlags: 0
@@ -526,6 +513,47 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::DeckController
   cardAtlas: {fileID: 4343727234628468602, guid: dede874a0c49aac4cb1442d371f08af3, type: 2}
   cardPrefab: {fileID: 3403582605777476612, guid: 1fdc9263c7335f0469eb2ff7983ba01e, type: 3}
+--- !u!114 &352264727
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 352264723}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fb6eb905c2977834d99b5a91f93d676a, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  gameBgmClip: {fileID: 8300000, guid: e35ef31b026c5c34b8dd1f4ee0663a3f, type: 3}
+  bgmVolume: 0.2
+  seVolume: 1
+  playerKoiKoiClip: {fileID: 8300000, guid: 43858da77a975b24ba939edead7cb95f, type: 3}
+  playerAgariClip: {fileID: 8300000, guid: 1577b6f211d43cd48b1475804d6d008f, type: 3}
+  enemyKoiKoiClip: {fileID: 8300000, guid: 1345be3302f3ed04f9df4c23802d1bda, type: 3}
+  enemyAgariClip: {fileID: 8300000, guid: f8a4b59fb51eaa444b4bedf303262965, type: 3}
+  playerVoiceClips:
+  - {fileID: 8300000, guid: d0361a1ab73dfab469a6b0c035a7780f, type: 3}
+  - {fileID: 8300000, guid: 33684580a218afe449f63314b12213ab, type: 3}
+  - {fileID: 8300000, guid: 6bf6bfadf0c410e4fa06007cc9f28298, type: 3}
+  enemyVoiceClips:
+  - {fileID: 8300000, guid: c8e0b8626e3668344be6698b0b3fbab7, type: 3}
+  - {fileID: 8300000, guid: 694c462f0dcc3fc4fbb6d1401bf30100, type: 3}
+  - {fileID: 8300000, guid: 2a070e1e5d52a75428f6762a1f7303e3, type: 3}
+--- !u!114 &352264728
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 352264723}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cfb9f2b45baa6ca4db06672e5e3eeb12, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  cutInEffectObject: {fileID: 2062322571}
+  cutInAnimator: {fileID: 2062322572}
 --- !u!1 &425898390
 GameObject:
   m_ObjectHideFlags: 0

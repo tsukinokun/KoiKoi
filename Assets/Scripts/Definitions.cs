@@ -1,7 +1,7 @@
-using System;
+ï»¿using System;
 using System.Collections.Generic;
 
-// ƒJ[ƒh©‘Ì‚Ìƒf[ƒ^\‘¢
+// ã‚«ãƒ¼ãƒ‰è‡ªä½“ã®ãƒ‡ãƒ¼ã‚¿æ§‹é€ 
 [Serializable]
 public class CardData
 {
@@ -17,7 +17,7 @@ public class CardList
     public List<CardData> cards;
 }
 
-// ƒ„ƒN‚Ìƒf[ƒ^\‘¢ ---
+// ãƒ¤ã‚¯ã®ãƒ‡ãƒ¼ã‚¿æ§‹é€  ---
 [Serializable]
 public class YakuData
 {

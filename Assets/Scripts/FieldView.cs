@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using Cysharp.Threading.Tasks;
 
@@ -13,6 +14,13 @@ public class FieldView : MonoBehaviour
 
     [Header("Animation Settings")]
     [SerializeField] private float moveDuration = 0.4f; // 🌟移動にかける時間を共通化
+
+    /// <summary>
+    /// このビューが持つカードのうちデータを保持しているものを列挙する
+    /// </summary>
+    public IEnumerable<Card> Cards => transform.Cast<Transform>()
+        .Select(t => t.GetComponent<Card>())
+        .Where(c => c != null && c.Data != null);
 
     /// <summary>
     /// 場にカードを新しく追加し、自動で再整列させる

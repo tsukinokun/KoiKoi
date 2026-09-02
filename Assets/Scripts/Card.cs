@@ -21,6 +21,9 @@ public class Card : MonoBehaviour
     // 🌟移動中かどうかを判定するフラグ（移動中にクリックされるのを防ぐなどの用途に）
     public bool IsMoving { get; private set; } = false;
 
+    // カードがクリックされたことを通知するイベント（GameManagerへの直接参照を持たないための疎結合化）
+    public static event Action<Card> Clicked;
+
     public void Initialize(CardData data, Sprite face, Sprite back)
     {
         this.Data = data;
@@ -48,12 +51,8 @@ public class Card : MonoBehaviour
         // 🌟移動中はクリックを受け付けない（バグ防止）
         if (IsMoving) return;
 
-        // GameManagerに通知
-        GameManager gm = GameObject.FindAnyObjectByType<GameManager>(); if (gm != null)
-        {
-            gm.OnCardSelected(this);
-            Debug.Log($"Card clicked: {Data.id}", this);
-        }
+        Debug.Log($"Card clicked: {Data.id}", this);
+        Clicked?.Invoke(this);
     }
 
     public void SetSelected(bool selected)

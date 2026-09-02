@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using System.Collections.Generic;
+using UnityEngine;
 using Cysharp.Threading.Tasks; // 🌟UniTaskを使用するために追加
 
 /// <summary>
@@ -11,6 +12,29 @@ public class CapturedAreaView : MonoBehaviour
     [SerializeField] private Transform taneParent;
     [SerializeField] private Transform tanParent;
     [SerializeField] private Transform kasuParent;
+
+    /// <summary>
+    /// 4つのカテゴリ（光・種・短冊・カス）に仕分けられたカードをすべて列挙する
+    /// </summary>
+    public IEnumerable<Card> Cards
+    {
+        get
+        {
+            Transform[] categoryParents = { hikariParent, taneParent, tanParent, kasuParent };
+            foreach (Transform categoryParent in categoryParents)
+            {
+                if (categoryParent == null) continue;
+                foreach (Transform child in categoryParent)
+                {
+                    Card card = child.GetComponent<Card>();
+                    if (card != null && card.Data != null)
+                    {
+                        yield return card;
+                    }
+                }
+            }
+        }
+    }
 
     [Header("Layout Settings")]
     [SerializeField] private float xSpacing = 0.3f; // 横にずらす幅

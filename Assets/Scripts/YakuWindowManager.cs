@@ -1,20 +1,20 @@
-using System;
+ï»¿using System;
 using UnityEngine;
-using UnityEngine.UI; // š•W€TextƒRƒ“ƒ|[ƒlƒ“ƒg‚ğˆµ‚¤‚½‚ß‚É•K{
+using UnityEngine.UI; // â˜…æ¨™æº–Textã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆã‚’æ‰±ã†ãŸã‚ã«å¿…é ˆ
 
 public class YakuWindowManager : MonoBehaviour
 {
     [Header("UI Elements")]
-    [SerializeField] private GameObject windowRoot; // HandWindowRoot©g
+    [SerializeField] private GameObject windowRoot; // HandWindowRootè‡ªèº«
     [SerializeField] private Text yakuNameText;     
     [SerializeField] private Text pointText;        
 
-    // UI‚ª•Â‚¶‚ç‚ê‚½‚±‚Æ‚ğGameManager‚É“`‚¦‚é‚½‚ß‚ÌƒR[ƒ‹ƒoƒbƒN
+    // UIãŒé–‰ã˜ã‚‰ã‚ŒãŸã“ã¨ã‚’GameManagerã«ä¼ãˆã‚‹ãŸã‚ã®ã‚³ãƒ¼ãƒ«ãƒãƒƒã‚¯
     private Action _onCloseCallback;
 
     private void Awake()
     {
-        // ‰Šúó‘Ô‚Å‚ÍŠmÀ‚É”ñ•\¦‚É‚µ‚Ä‚¨‚­
+        // åˆæœŸçŠ¶æ…‹ã§ã¯ç¢ºå®Ÿã«éè¡¨ç¤ºã«ã—ã¦ãŠã
         if (windowRoot != null)
         {
             windowRoot.SetActive(false);
@@ -22,34 +22,34 @@ public class YakuWindowManager : MonoBehaviour
     }
 
     /// <summary>
-    /// o—ˆ–ğƒEƒBƒ“ƒhƒE‚ğ•\¦‚·‚é
+    /// å‡ºæ¥å½¹ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ã‚’è¡¨ç¤ºã™ã‚‹
     /// </summary>
     public void ShowYaku(string yakuName, int points, Action onClose)
     {
         if (windowRoot == null || yakuNameText == null)
         {
-            Debug.LogError("YakuWindowManager: •K—v‚ÈUIƒRƒ“ƒ|[ƒlƒ“ƒg‚ªƒAƒTƒCƒ“‚³‚ê‚Ä‚¢‚Ü‚¹‚ñB");
+            Debug.LogError("YakuWindowManager: å¿…è¦ãªUIã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆãŒã‚¢ã‚µã‚¤ãƒ³ã•ã‚Œã¦ã„ã¾ã›ã‚“ã€‚");
             onClose?.Invoke();
             return;
         }
 
-        // ƒeƒLƒXƒg‚ÌXV
+        // ãƒ†ã‚­ã‚¹ãƒˆã®æ›´æ–°
         if (pointText != null)
         {
             yakuNameText.text = yakuName;
-            pointText.text = points + " •¶";
+            pointText.text = points + " æ–‡";
         }
         else
         {
-            // ‚à‚µƒeƒLƒXƒgƒRƒ“ƒ|[ƒlƒ“ƒg‚ª1‚ÂiHandText‚Ì‚İj‚È‚çA‰üs‚µ‚Ä‚Ü‚Æ‚ß‚Ä•\¦
-            // •W€Text—p‚ÌƒVƒ“ƒvƒ‹‚È•¶š—ñŒ‹‡‚ÉC³
-            yakuNameText.text = yakuName + "\n" + points + " •¶";
+            // ã‚‚ã—ãƒ†ã‚­ã‚¹ãƒˆã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆãŒ1ã¤ï¼ˆHandTextã®ã¿ï¼‰ãªã‚‰ã€æ”¹è¡Œã—ã¦ã¾ã¨ã‚ã¦è¡¨ç¤º
+            // æ¨™æº–Textç”¨ã®ã‚·ãƒ³ãƒ—ãƒ«ãªæ–‡å­—åˆ—çµåˆã«ä¿®æ­£
+            yakuNameText.text = yakuName + "\n" + points + " æ–‡";
         }
 
-        // ƒR[ƒ‹ƒoƒbƒN‚Ì“o˜^
+        // ã‚³ãƒ¼ãƒ«ãƒãƒƒã‚¯ã®ç™»éŒ²
         _onCloseCallback = onClose;
 
-        // ƒEƒBƒ“ƒhƒE‚ğƒAƒNƒeƒBƒu‚É‚·‚é
+        // ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ã‚’ã‚¢ã‚¯ãƒ†ã‚£ãƒ–ã«ã™ã‚‹
         windowRoot.SetActive(true);
     }
 
@@ -60,7 +60,7 @@ public class YakuWindowManager : MonoBehaviour
             windowRoot.SetActive(false);
         }
 
-        // “o˜^‚³‚ê‚Ä‚¢‚½I—¹ˆ—iGameManager‘¤‚ÌŸ‚Ìƒ^[ƒ“‘JˆÚ‚È‚Çj‚ğÀs
+        // ç™»éŒ²ã•ã‚Œã¦ã„ãŸçµ‚äº†æ™‚å‡¦ç†ï¼ˆGameManagerå´ã®æ¬¡ã®ã‚¿ãƒ¼ãƒ³é·ç§»ãªã©ï¼‰ã‚’å®Ÿè¡Œ
         _onCloseCallback?.Invoke();
         _onCloseCallback = null;
     }

@@ -1,7 +1,7 @@
-using System.Collections.Generic;
+ï»¿using System.Collections.Generic;
 using System.Linq;
 
-/// Šl“¾‚µ‚½ƒJ[ƒh‚Ìƒf[ƒ^ƒŠƒXƒg‚©‚ç¬—§‚µ‚Ä‚¢‚é–ğ‚ğ”»’è‚·‚éƒˆƒƒWƒbƒNƒNƒ‰ƒX
+/// ç²å¾—ã—ãŸã‚«ãƒ¼ãƒ‰ã®ãƒ‡ãƒ¼ã‚¿ãƒªã‚¹ãƒˆã‹ã‚‰æˆç«‹ã—ã¦ã„ã‚‹å½¹ã‚’åˆ¤å®šã™ã‚‹ç´”ç²‹ãƒ­ã‚¸ãƒƒã‚¯ã‚¯ãƒ©ã‚¹
 public static class YakuEvaluator
 {
     public static List<YakuResult> CheckAllYaku(List<CardData> capturedCards)
@@ -10,12 +10,12 @@ public static class YakuEvaluator
 
         if (capturedCards == null || capturedCards.Count == 0) return results;
 
-        // --- ŠeíƒJƒEƒ“ƒgEƒtƒ‰ƒOˆ— ---
+        // --- å„ç¨®ã‚«ã‚¦ãƒ³ãƒˆãƒ»ãƒ•ãƒ©ã‚°å‡¦ç† ---
         int hikariCount = capturedCards.Count(c => c.type == "Hikari");
         int kasuCount = capturedCards.Count(c => c.type == "Kasu");
         int taneCount = capturedCards.Count(c => c.type == "Tane");
 
-        // type–¼‚ª "Tan" ‚Æ "Tanzaku" ‚Ì‚Ç‚¿‚ç‚Å‚àƒqƒbƒg‚·‚é‚æ‚¤‚É¬•¶š‚É‚µ‚Ä”»’è
+        // typeåãŒ "Tan" ã¨ "Tanzaku" ã®ã©ã¡ã‚‰ã§ã‚‚ãƒ’ãƒƒãƒˆã™ã‚‹ã‚ˆã†ã«å°æ–‡å­—ã«ã—ã¦åˆ¤å®š
         int tanzakuCount = capturedCards.Count(c => c.type.ToLower() == "tan" || c.type.ToLower() == "tanzaku");
 
         bool hasAme = capturedCards.Any(c => c.tags.Contains("Ame"));
@@ -26,66 +26,66 @@ public static class YakuEvaluator
         int aotanCount = capturedCards.Count(c => c.tags.Contains("Aotan"));
 
         // ----------------------------------------------------
-        // ”»’è‡@FŒõDŒniãˆÊ‚Ì–ğ‚ª‰ºˆÊ‚Ì–ğ‚ğ“à•ï‚·‚é‚½‚ß“ÆèŒ^j
+        // åˆ¤å®šâ‘ ï¼šå…‰æœ­ç³»ï¼ˆä¸Šä½ã®å½¹ãŒä¸‹ä½ã®å½¹ã‚’å†…åŒ…ã™ã‚‹ãŸã‚ç‹¬å å‹ï¼‰
         // ----------------------------------------------------
         if (hikariCount == 5)
         {
-            results.Add(new YakuResult("ŒÜŒõ", 15));
+            results.Add(new YakuResult("äº”å…‰", 15));
         }
         else if (hikariCount == 4 && !hasAme)
         {
-            results.Add(new YakuResult("lŒõ", 8));
+            results.Add(new YakuResult("å››å…‰", 8));
         }
         else if (hikariCount == 4 && hasAme)
         {
-            results.Add(new YakuResult("‰JlŒõ", 7));
+            results.Add(new YakuResult("é›¨å››å…‰", 7));
         }
         else if (hikariCount == 3 && !hasAme)
         {
-            results.Add(new YakuResult("OŒõ", 5));
+            results.Add(new YakuResult("ä¸‰å…‰", 5));
         }
 
         // ----------------------------------------------------
-        // ”»’è‡AF“Æ—§‚µ‚½“Áê–ğid•¡‚µ‚Ä¬—§‚·‚éj
+        // åˆ¤å®šâ‘¡ï¼šç‹¬ç«‹ã—ãŸç‰¹æ®Šå½¹ï¼ˆé‡è¤‡ã—ã¦æˆç«‹ã™ã‚‹ï¼‰
         // ----------------------------------------------------
         if (inoshikachoCount == 3)
         {
-            results.Add(new YakuResult("’–­’±", 5));
+            results.Add(new YakuResult("çŒªé¹¿è¶", 5));
         }
         if (akatanCount == 3)
         {
-            results.Add(new YakuResult("Ô’Z", 5));
+            results.Add(new YakuResult("èµ¤çŸ­", 5));
         }
         if (aotanCount == 3)
         {
-            results.Add(new YakuResult("Â’Z", 5));
+            results.Add(new YakuResult("é’çŸ­", 5));
         }
 
-        // ‰ÔŒ©‚Åˆê”t (”u { ÷‚É–‹)
+        // èŠ±è¦‹ã§ä¸€æ¯ (ç›ƒ ï¼‹ æ¡œã«å¹•)
         if (hasSakazuki && capturedCards.Any(c => c.month == 3 && c.type == "Hikari"))
         {
-            results.Add(new YakuResult("‰ÔŒ©‚Åˆê”t", 5));
+            results.Add(new YakuResult("èŠ±è¦‹ã§ä¸€æ¯", 5));
         }
-        // ŒŒ©‚Åˆê”t (”u { ƒXƒXƒL‚ÉŒ)
+        // æœˆè¦‹ã§ä¸€æ¯ (ç›ƒ ï¼‹ ã‚¹ã‚¹ã‚­ã«æœˆ)
         if (hasSakazuki && capturedCards.Any(c => c.month == 8 && c.type == "Hikari"))
         {
-            results.Add(new YakuResult("ŒŒ©‚Åˆê”t", 5));
+            results.Add(new YakuResult("æœˆè¦‹ã§ä¸€æ¯", 5));
         }
 
         // ----------------------------------------------------
-        // ”»’è‡BF–‡”Œn‚Ì’Êí–ğid•¡‚µ‚Ä¬—§‚·‚éj
+        // åˆ¤å®šâ‘¢ï¼šæšæ•°ç³»ã®é€šå¸¸å½¹ï¼ˆé‡è¤‡ã—ã¦æˆç«‹ã™ã‚‹ï¼‰
         // ----------------------------------------------------
         if (taneCount >= 5)
         {
-            results.Add(new YakuResult("ƒ^ƒl", 1 + (taneCount - 5)));
+            results.Add(new YakuResult("ã‚¿ãƒ", 1 + (taneCount - 5)));
         }
         if (tanzakuCount >= 5)
         {
-            results.Add(new YakuResult("ƒ^ƒ“", 1 + (tanzakuCount - 5)));
+            results.Add(new YakuResult("ã‚¿ãƒ³", 1 + (tanzakuCount - 5)));
         }
         if (kasuCount >= 10)
         {
-            results.Add(new YakuResult("‚©‚·", 1 + (kasuCount - 10)));
+            results.Add(new YakuResult("ã‹ã™", 1 + (kasuCount - 10)));
         }
 
         return results;
