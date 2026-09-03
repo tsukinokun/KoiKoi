@@ -49,6 +49,8 @@ public class FieldView : MonoBehaviour
             .ToList();
         foreach (Card card in children)
         {
+            // Destroyはフレームの終わりまで反映されないため、先に親から切り離してchildCountを即座に正しくする
+            card.transform.SetParent(null);
             Destroy(card.gameObject);
         }
     }

@@ -60,6 +60,8 @@ public class CapturedAreaView : MonoBehaviour
             foreach (Transform child in categoryParent) children.Add(child);
             foreach (Transform child in children)
             {
+                // Destroyはフレームの終わりまで反映されないため、先に親から切り離してchildCountを即座に正しくする
+                child.SetParent(null);
                 Destroy(child.gameObject);
             }
         }

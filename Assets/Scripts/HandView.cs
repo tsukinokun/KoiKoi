@@ -85,6 +85,8 @@ public class HandView : MonoBehaviour
         List<Transform> children = transform.Cast<Transform>().ToList();
         foreach (Transform child in children)
         {
+            // Destroyはフレームの終わりまで反映されないため、先に親から切り離してchildCountを即座に正しくする
+            child.SetParent(null);
             Destroy(child.gameObject);
         }
     }
