@@ -78,6 +78,18 @@ public class HandView : MonoBehaviour
     }
 
     /// <summary>
+    /// ラウンドを再スタートする際に、保持しているカードをすべて破棄する
+    /// </summary>
+    public void Clear()
+    {
+        List<Transform> children = transform.Cast<Transform>().ToList();
+        foreach (Transform child in children)
+        {
+            Destroy(child.gameObject);
+        }
+    }
+
+    /// <summary>
     /// 扇形配置における、指定インデックス（全体枚数total中のindex番目）のローカル座標と回転を計算する
     /// </summary>
     private (Vector3 localPosition, Quaternion rotation) CalculateSlot(int index, int total)

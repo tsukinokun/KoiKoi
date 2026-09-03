@@ -4,6 +4,7 @@ using UnityEngine;
 using System.Linq;
 using Cysharp.Threading.Tasks;
 using System.Threading;
+using UnityEngine.SceneManagement;
 
 public class GameManager : MonoBehaviour
 {
@@ -31,6 +32,7 @@ public class GameManager : MonoBehaviour
     [SerializeField] private AudioManager audioManager;
     [SerializeField] private CutInPresenter cutInPresenter;
     [SerializeField] private YakuWindowManager yakuWindowManager;
+    [SerializeField] private ScoreLedger scoreLedger;
 
     [Header("Initial Deal Settings")]
     [SerializeField] private int initialHandCount = 8;  // お互いの初期手札枚数
@@ -77,8 +79,29 @@ public class GameManager : MonoBehaviour
 
         if (koiKoiChoicePanel != null) koiKoiChoicePanel.SetActive(false);
 
+        GameSession.TotalRounds = Mathf.Max(1, GameSession.TotalRounds);
+        GameSession.CurrentRound = Mathf.Clamp(GameSession.CurrentRound, 1, GameSession.TotalRounds);
+
+        UpdateScoreLedger();
+
+        StartRound();
+    }
+
+    /// <summary>
+    /// 1局（ラウンド）分の対局を初期化して開始する。複数局の対局モードでは局が変わるたびに呼び直す
+    /// </summary>
+    private void StartRound()
+    {
+        _currentState = TurnState.PlayerTurn;
         _playerLastTotalPoints = 0;
         _enemyLastTotalPoints = 0;
+
+        // 前局のカードが残っていればすべて破棄してからボードをリセットする
+        playerHandView?.Clear();
+        enemyHandView?.Clear();
+        fieldView?.Clear();
+        playerCapturedView?.Clear();
+        enemyCapturedView?.Clear();
 
         if (deckController != null)
         {
@@ -88,7 +111,7 @@ public class GameManager : MonoBehaviour
         // カードが内部的にドローされて各Viewの子要素に収まる
         DealInitialCards();
 
-        // ゲーム開始時、プレイヤーの最初の手札のエフェクトをチェック
+        // ラウンド開始時、プレイヤーの最初の手札のエフェクトをチェック
         HighlightMatchableCards();
     }
 
@@ -285,6 +308,11 @@ public class GameManager : MonoBehaviour
         if (deckController == null || deckController.Count == 0)
         {
             Debug.LogWarning("山札が空になりました。");
+            if (IsHandsEmpty())
+            {
+                EndRound(isDraw: true, isPlayerWinner: false, points: 0);
+                return;
+            }
             SetNextTurn(isPlayer);
             return;
         }
@@ -336,7 +364,23 @@ public class GameManager : MonoBehaviour
 
         await UniTask.WaitUntil(() => isYakuFlowDone, cancellationToken: _destroyToken);
 
+        if (IsHandsEmpty())
+        {
+            EndRound(isDraw: true, isPlayerWinner: false, points: 0);
+            return;
+        }
+
         SetNextTurn(isPlayer);
+    }
+
+    /// <summary>
+    /// プレイヤー・敵の両方の手札が尽きたか（=山札切れによる引き分け条件）を判定する
+    /// </summary>
+    private bool IsHandsEmpty()
+    {
+        bool playerEmpty = playerHandView == null || !playerHandView.Cards.Any();
+        bool enemyEmpty = enemyHandView == null || !enemyHandView.Cards.Any();
+        return playerEmpty && enemyEmpty;
     }
 
     void SetNextTurn(bool currentIsPlayer)
@@ -515,15 +559,50 @@ public class GameManager : MonoBehaviour
 
     private void OnGameEnd(bool isPlayerWinner)
     {
+        int points = CheckAllYaku(isPlayerWinner).Sum(y => y.Points);
+        EndRound(isDraw: false, isPlayerWinner: isPlayerWinner, points: points);
+    }
+
+    /// <summary>
+    /// 1局の終了処理。累計スコアを更新し、対局が続くなら次局を開始、
+    /// 規定局数を消化していればResultシーンへ遷移する
+    /// </summary>
+    private void EndRound(bool isDraw, bool isPlayerWinner, int points)
+    {
         _currentState = TurnState.CheckingMatch;
-        if (isPlayerWinner)
+
+        if (isDraw)
         {
-            Debug.Log($"✨【GAME OVER】プレイヤーの勝ちです！ 最終得点: {CheckAllYaku(true).Sum(y => y.Points)}点 ✨");
+            Debug.Log("🤝【局終了】山札・手札が尽きたため引き分けです。");
+        }
+        else if (isPlayerWinner)
+        {
+            GameSession.PlayerScore += points;
+            Debug.Log($"✨【局終了】プレイヤーの勝ちです！ 獲得: {points}点 ✨");
         }
         else
         {
-            Debug.Log($"💀【GAME OVER】NPCの勝ちです... 最終得点: {CheckAllYaku(false).Sum(y => y.Points)}点 💀");
+            GameSession.EnemyScore += points;
+            Debug.Log($"💀【局終了】NPCの勝ちです... 獲得: {points}点 💀");
         }
+
+        UpdateScoreLedger();
+
+        GameSession.CurrentRound++;
+
+        if (GameSession.CurrentRound <= GameSession.TotalRounds)
+        {
+            StartRound();
+        }
+        else
+        {
+            SceneManager.LoadScene("Result");
+        }
+    }
+
+    private void UpdateScoreLedger()
+    {
+        scoreLedger?.UpdateScores(GameSession.PlayerScore, GameSession.EnemyScore);
     }
 
     private async UniTaskVoid NPCTurnRoutineAsync()

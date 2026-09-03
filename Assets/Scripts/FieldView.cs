@@ -39,6 +39,21 @@ public class FieldView : MonoBehaviour
     }
 
     /// <summary>
+    /// ラウンドを再スタートする際に、保持しているカードをすべて破棄する
+    /// </summary>
+    public void Clear()
+    {
+        List<Card> children = transform.Cast<Transform>()
+            .Select(t => t.GetComponent<Card>())
+            .Where(c => c != null)
+            .ToList();
+        foreach (Card card in children)
+        {
+            Destroy(card.gameObject);
+        }
+    }
+
+    /// <summary>
     /// 🌟すべての場札を現在の枚数に応じたグリッド位置へ「ぬるっと」移動させる
     /// </summary>
     public void Rearrange()

@@ -48,6 +48,24 @@ public class CapturedAreaView : MonoBehaviour
     public float MoveDuration => moveDuration; // 外部から時間を参照できるようにする
 
     /// <summary>
+    /// ラウンドを再スタートする際に、保持しているカードをすべて破棄する
+    /// </summary>
+    public void Clear()
+    {
+        Transform[] categoryParents = { hikariParent, taneParent, tanParent, kasuParent };
+        foreach (Transform categoryParent in categoryParents)
+        {
+            if (categoryParent == null) continue;
+            List<Transform> children = new List<Transform>();
+            foreach (Transform child in categoryParent) children.Add(child);
+            foreach (Transform child in children)
+            {
+                Destroy(child.gameObject);
+            }
+        }
+    }
+
+    /// <summary>
     /// カードをタイプに応じて適切な親トランスフォームに割り振り、滑らかに整列させる
     /// </summary>
     public void AddCard(Card card, string cardType)
