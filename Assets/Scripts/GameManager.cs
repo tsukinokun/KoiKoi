@@ -25,6 +25,10 @@ public class GameManager : MonoBehaviour
     // 現在選択されているカードの参照
     private Card _currentSelectedCard;
 
+    // 山札めくりで複数一致した際に、プレイヤーの選択待ちとなっている候補場札と選択結果
+    private List<Card> _pendingDeckMatchCandidates;
+    private Card _selectedDeckMatchFieldCard;
+
     [Header("Koi-Koi UI")]
     [SerializeField] private GameObject koiKoiChoicePanel;
 
@@ -141,6 +145,19 @@ public class GameManager : MonoBehaviour
     public void OnCardSelected(Card clickedCard)
     {
         if (clickedCard == null) return;
+
+        // --- 山札めくりで複数一致した場札の選択待ち中の場合 ---
+        if (_currentState == TurnState.SelectingDeckMatch)
+        {
+            if (fieldView != null && clickedCard.transform.parent == fieldView.transform
+                && _pendingDeckMatchCandidates != null && _pendingDeckMatchCandidates.Contains(clickedCard))
+            {
+                audioManager?.PlayPlayerVoice();
+                _selectedDeckMatchFieldCard = clickedCard;
+            }
+            return;
+        }
+
         if (_currentState != TurnState.PlayerTurn) return;
         if (clickedCard.Data == null) return;
 
@@ -319,15 +336,17 @@ public class GameManager : MonoBehaviour
 
         Card drawnCard = deckController.DrawCard();
 
-        if (fieldView != null) fieldView.AddCard(drawnCard, true);
+        // 🌟 山札の場所で表向きに反転させるだけで、まだ場には加えない（一致判定＆選択が確定するまで待機させる）
+        drawnCard.SetFaceUp(true);
 
         Debug.Log($"山札からめくった札: {drawnCard.Data.month}月 ({drawnCard.Data.type})");
 
-        // 山札から引いたカードと一致する場札（自分自身は除く）を全て取得
+        // 山札から引いたカードと一致する場札を全て取得
         List<Card> matchingFieldCards = fieldView != null
-            ? fieldView.Cards.Where(c => c != drawnCard && c.Data.month == drawnCard.Data.month).ToList()
+            ? fieldView.Cards.Where(c => c.Data.month == drawnCard.Data.month).ToList()
             : new List<Card>();
 
+        // 山札の場所でめくり演出を見せるための待機
         await UniTask.Delay(TimeSpan.FromSeconds(deckCardRevealDelay), cancellationToken: _destroyToken);
 
         if (matchingFieldCards.Count > 0)
@@ -337,17 +356,40 @@ public class GameManager : MonoBehaviour
             {
                 Debug.Log($"【山札めくり3枚一致】{drawnCard.Data.month}月が場札の3枚すべてと一致！総取りします。");
             }
+            else if (matchingFieldCards.Count == 2 && isPlayer)
+            {
+                // 🌟 プレイヤーの番で2枚一致した場合は、自動選択せず場札を光らせてクリックでの選択を待つ
+                Debug.Log($"【山札めくり複数一致】取れるカードが{matchingFieldCards.Count}枚あります。場札を選択してください。");
+
+                _pendingDeckMatchCandidates = matchingFieldCards;
+                _selectedDeckMatchFieldCard = null;
+                _currentState = TurnState.SelectingDeckMatch;
+                HighlightMatchingFieldCards(drawnCard.Data.month);
+
+                await UniTask.WaitUntil(() => _selectedDeckMatchFieldCard != null, cancellationToken: _destroyToken);
+
+                matchingFieldCards = new List<Card> { _selectedDeckMatchFieldCard };
+
+                ClearAllFieldGlows();
+                _pendingDeckMatchCandidates = null;
+                _selectedDeckMatchFieldCard = null;
+                _currentState = TurnState.CheckingMatch;
+            }
             else
             {
-                // 通常時（1枚、または2枚あるうちの1枚。2枚の時はルール上どれを貰っても同じなので最初の1枚を選択）
+                // NPCの番、または1枚のみ一致（2枚の時はルール上どれを貰っても同じなので最初の1枚を選択）
                 Debug.Log($"【山札めくり一致】{drawnCard.Data.month}月が場札と一致！獲得します。");
                 matchingFieldCards = new List<Card> { matchingFieldCards[0] };
             }
+
+            // 🌟 CollectCardsAsync が自前で場への追従・重ね合わせ移動を行うため、
+            //     ここで AddCard（Rearrangeによるグリッド移動）は呼ばない（二重アニメーションによるちらつき防止）
             await CollectCardsAsync(drawnCard, matchingFieldCards, isPlayer, shouldTriggerNextStep: false);
         }
         else
         {
             Debug.Log($"【山札めくり不一致】一致する月がないため、場札に加えます。");
+            if (fieldView != null) fieldView.AddCard(drawnCard, true);
         }
 
         if (fieldView != null)
