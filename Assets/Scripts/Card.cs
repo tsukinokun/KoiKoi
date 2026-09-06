@@ -2,6 +2,7 @@
 using System.Threading;
 using Cysharp.Threading.Tasks; // 🌟UniTaskのインポート
 using UnityEngine;
+using UnityEngine.Rendering;
 
 public class Card : MonoBehaviour
 {
@@ -11,6 +12,7 @@ public class Card : MonoBehaviour
     private Sprite _faceSprite;
     private Sprite _backSprite;
     private SpriteRenderer _sr;
+    private SortingGroup _sortingGroup;
 
     private bool _isSelected = false;
     private Vector3 _originalLocalPos; // 選択解除時に戻る場所
@@ -20,6 +22,15 @@ public class Card : MonoBehaviour
 
     // 🌟移動中かどうかを判定するフラグ（移動中にクリックされるのを防ぐなどの用途に）
     public bool IsMoving { get; private set; } = false;
+
+    // カードの描画順
+    // （畳=0 ＜ 裏向き=10 ＜ 表向き=20 ＜ 出した札・めくった札=30 ＜ カットイン=100 ＜ 各種ウィンドウ=150）
+    private const int FaceDownSortingOrder = 10;
+    private const int FaceUpSortingOrder = 20;
+    private const int OnTopSortingOrder = 30;
+
+    private bool _isFaceUp = false;
+    private bool _isOnTop = false;
 
     // カードがクリックされたことを通知するイベント（GameManagerへの直接参照を持たないための疎結合化）
     public static event Action<Card> Clicked;
@@ -31,6 +42,11 @@ public class Card : MonoBehaviour
         this._backSprite = back;
 
         _sr = GetComponent<SpriteRenderer>();
+
+        // 🌟 場や手札のコンテナが持つSortingGroupに描画順を乗っ取られないようにする。
+        //    これがないと「表向き/裏向き」の描画順が入れ物の中でしか効かなくなる。
+        _sortingGroup = GetComponent<SortingGroup>();
+        if (_sortingGroup != null) _sortingGroup.sortAtRoot = true;
 
         // 最初は山札なので裏向き
         SetFaceUp(false);
@@ -44,6 +60,37 @@ public class Card : MonoBehaviour
     {
         if (_sr == null) _sr = GetComponent<SpriteRenderer>();
         _sr.sprite = isFaceUp ? _faceSprite : _backSprite;
+
+        _isFaceUp = isFaceUp;
+        ApplySortingOrder();
+    }
+
+    /// <summary>
+    /// 🌟出した札・めくった札を、既にある場札より手前に描画させる（移動・重ね演出の間だけ有効にする）
+    /// </summary>
+    public void SetOnTop(bool onTop)
+    {
+        _isOnTop = onTop;
+        ApplySortingOrder();
+    }
+
+    /// <summary>
+    /// 表裏と「出した札かどうか」から描画順を決める。
+    /// どの入れ物（場・手札など）に入っていても、表向きは裏向きより手前・出した札は場札より手前になる。
+    /// </summary>
+    private void ApplySortingOrder()
+    {
+        if (_sortingGroup == null) _sortingGroup = GetComponent<SortingGroup>();
+        if (_sortingGroup == null) return;
+
+        if (!_isFaceUp)
+        {
+            _sortingGroup.sortingOrder = FaceDownSortingOrder;
+        }
+        else
+        {
+            _sortingGroup.sortingOrder = _isOnTop ? OnTopSortingOrder : FaceUpSortingOrder;
+        }
     }
 
     private void OnMouseDown()
@@ -82,6 +129,42 @@ public class Card : MonoBehaviour
         {
             glowObject.SetActive(active);
         }
+    }
+
+    /// <summary>
+    /// 🌟追加：くるっと回転してめくるアニメーション（0°→90°でスプライトを差し替え→0°に戻す）
+    /// </summary>
+    public async UniTask FlipAsync(bool isFaceUp, float duration, CancellationToken cancellationToken = default)
+    {
+        IsMoving = true;
+
+        float half = duration / 2f;
+
+        float elapsed = 0f;
+        while (elapsed < half)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            elapsed += Time.deltaTime;
+            float angle = Mathf.SmoothStep(0f, 90f, elapsed / half);
+            transform.localRotation = Quaternion.Euler(0f, angle, 0f);
+            await UniTask.Yield(PlayerLoopTiming.Update, cancellationToken);
+        }
+        transform.localRotation = Quaternion.Euler(0f, 90f, 0f);
+
+        SetFaceUp(isFaceUp);
+
+        elapsed = 0f;
+        while (elapsed < half)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            elapsed += Time.deltaTime;
+            float angle = Mathf.SmoothStep(90f, 0f, elapsed / half);
+            transform.localRotation = Quaternion.Euler(0f, angle, 0f);
+            await UniTask.Yield(PlayerLoopTiming.Update, cancellationToken);
+        }
+        transform.localRotation = Quaternion.identity;
+
+        IsMoving = false;
     }
 
     /// <summary>

@@ -44,6 +44,7 @@ public class GameManager : MonoBehaviour
 
     [Header("Timing Settings")]
     [SerializeField] private float deckDrawAnticipationDelay = 0.8f; // 山札をめくる直前の「溜め」
+    [SerializeField] private float deckFlipDuration = 0.3f;          // 山札のカードがくるっとめくれる演出時間
     [SerializeField] private float deckCardRevealDelay = 1.0f;       // めくったカードを見せる時間
     [SerializeField] private float fieldRearrangeDelay = 0.8f;       // 場札整列後、役判定に移るまでの間
     [SerializeField] private float captureOverlapDuration = 0.5f;    // 獲得時に重なるまでのアニメーション時間
@@ -336,8 +337,11 @@ public class GameManager : MonoBehaviour
 
         Card drawnCard = deckController.DrawCard();
 
-        // 🌟 山札の場所で表向きに反転させるだけで、まだ場には加えない（一致判定＆選択が確定するまで待機させる）
-        drawnCard.SetFaceUp(true);
+        // 🌟 めくった札は、場に落ち着くまで場札より手前に描画する
+        drawnCard.SetOnTop(true);
+
+        // 🌟 山札の場所でくるっとめくって表向きにする。まだ場には加えない（一致判定＆選択が確定するまで待機させる）
+        await drawnCard.FlipAsync(true, deckFlipDuration, _destroyToken);
 
         Debug.Log($"山札からめくった札: {drawnCard.Data.month}月 ({drawnCard.Data.type})");
 
@@ -390,6 +394,9 @@ public class GameManager : MonoBehaviour
         {
             Debug.Log($"【山札めくり不一致】一致する月がないため、場札に加えます。");
             if (fieldView != null) fieldView.AddCard(drawnCard, true);
+
+            // 場札として並んだので、以後は他の場札と同じ扱いに戻す
+            drawnCard.SetOnTop(false);
         }
 
         if (fieldView != null)
@@ -466,6 +473,9 @@ public class GameManager : MonoBehaviour
             handCard.SetGlow(false);
             handCard.SetFaceUp(true);
 
+            // 🌟 出した札は、重ね演出の間ずっと場札より手前に描画する
+            handCard.SetOnTop(true);
+
             // 2. 移動先のローカル座標を算出（重ね合わせ効果。演出として先頭のカードに重ねる）
             Vector3 fieldLocalPos = overlapTargetCard.transform.localPosition;
             Vector3 overlapTargetPos = fieldLocalPos + captureOverlapOffset;
@@ -505,6 +515,7 @@ public class GameManager : MonoBehaviour
         card.SetSelected(false);
         card.SetFaceUp(true);
         card.SetGlow(false);
+        card.SetOnTop(false); // 獲得エリアに移るので、出した札の一時的な描画順を解除する
 
         if (isPlayer)
         {
