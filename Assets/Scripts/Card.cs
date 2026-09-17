@@ -24,13 +24,15 @@ public class Card : MonoBehaviour
     public bool IsMoving { get; private set; } = false;
 
     // カードの描画順
-    // （畳=0 ＜ 裏向き=10 ＜ 表向き=20 ＜ 出した札・めくった札=30 ＜ カットイン=100 ＜ 各種ウィンドウ=150）
+    // （畳=0 ＜ 山札(裏向き)=10 ＜ 場札・獲得札(表向き)=20 ＜ 手札(表裏問わず)=25 ＜ 出した札・めくった札=30 ＜ カットイン=100 ＜ 各種ウィンドウ=150）
     private const int FaceDownSortingOrder = 10;
     private const int FaceUpSortingOrder = 20;
+    private const int InHandSortingOrder = 25;
     private const int OnTopSortingOrder = 30;
 
     private bool _isFaceUp = false;
     private bool _isOnTop = false;
+    private bool _isInHand = false;
 
     // カードがクリックされたことを通知するイベント（GameManagerへの直接参照を持たないための疎結合化）
     public static event Action<Card> Clicked;
@@ -74,22 +76,32 @@ public class Card : MonoBehaviour
         ApplySortingOrder();
     }
 
+    private void OnTransformParentChanged()
+    {
+        _isInHand = transform.parent != null && transform.parent.GetComponent<HandView>() != null;
+        ApplySortingOrder();
+    }
+
     /// <summary>
-    /// 表裏と「出した札かどうか」から描画順を決める。
-    /// どの入れ物（場・手札など）に入っていても、表向きは裏向きより手前・出した札は場札より手前になる。
+    /// 表裏・手札にいるか・出した札かどうかから描画順を決める。
     /// </summary>
     private void ApplySortingOrder()
     {
         if (_sortingGroup == null) _sortingGroup = GetComponent<SortingGroup>();
         if (_sortingGroup == null) return;
 
-        if (!_isFaceUp)
+        if (_isFaceUp && _isOnTop)
         {
-            _sortingGroup.sortingOrder = FaceDownSortingOrder;
+            _sortingGroup.sortingOrder = OnTopSortingOrder;
+        }
+        else if (_isInHand)
+        {
+            // 相手の裏向き手札も含め、手札は常に場札より手前
+            _sortingGroup.sortingOrder = InHandSortingOrder;
         }
         else
         {
-            _sortingGroup.sortingOrder = _isOnTop ? OnTopSortingOrder : FaceUpSortingOrder;
+            _sortingGroup.sortingOrder = _isFaceUp ? FaceUpSortingOrder : FaceDownSortingOrder;
         }
     }
 

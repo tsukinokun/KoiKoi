@@ -272,6 +272,8 @@ public class GameManager : MonoBehaviour
             _currentSelectedCard = null;
             hand.SetSelected(false);
 
+            // 場へ移動する間、残りの手札や場札の下を通らないようにする
+            hand.SetOnTop(true);
             if (fieldView != null) fieldView.AddCard(hand, true);
 
             // 親が変わったので、安全に再整列
@@ -394,13 +396,12 @@ public class GameManager : MonoBehaviour
         {
             Debug.Log($"【山札めくり不一致】一致する月がないため、場札に加えます。");
             if (fieldView != null) fieldView.AddCard(drawnCard, true);
-
-            // 場札として並んだので、以後は他の場札と同じ扱いに戻す
-            drawnCard.SetOnTop(false);
         }
 
         if (fieldView != null)
         {
+            // 場に出した札・めくった札は、ここで通常の場札と同じ描画順に戻す
+            foreach (Card fc in fieldView.Cards) fc.SetOnTop(false);
             fieldView.Rearrange();
         }
         await UniTask.Delay(TimeSpan.FromSeconds(fieldRearrangeDelay), cancellationToken: _destroyToken);
@@ -699,6 +700,7 @@ public class GameManager : MonoBehaviour
             {
                 audioManager?.PlayEnemyVoice();
                 Card discard = enemyHandView.transform.GetChild(0).GetComponent<Card>();
+                discard.SetOnTop(true);
                 if (fieldView != null) fieldView.AddCard(discard, true);
 
                 enemyHandView.Rearrange(discard);
