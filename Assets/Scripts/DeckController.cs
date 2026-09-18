@@ -1,5 +1,4 @@
 ﻿using System.Collections.Generic;
-using System.IO;
 using UnityEngine;
 using UnityEngine.U2D;
 
@@ -11,6 +10,8 @@ public class DeckController : MonoBehaviour
     [Header("Assets")]
     [SerializeField] private SpriteAtlas cardAtlas;
     [SerializeField] private GameObject cardPrefab;
+
+    private const string CardMasterResourcePath = "JSON/cards_master";
 
     // 山札の実体
     private List<Card> _deck = new List<Card>();
@@ -32,15 +33,15 @@ public class DeckController : MonoBehaviour
         }
         _deck.Clear();
 
-        string path = Path.Combine(Application.streamingAssetsPath, "JSON", "cards_master.json");
-        if (!File.Exists(path))
+        // Resources経由で読む（StreamingAssetsのファイル読み込みはAndroid/WebGLで失敗するため）
+        TextAsset json = Resources.Load<TextAsset>(CardMasterResourcePath);
+        if (json == null)
         {
-            Debug.LogError($"JSONファイルが見つかりません: {path}");
+            Debug.LogError($"カードマスターが見つかりません: Resources/{CardMasterResourcePath}");
             return;
         }
 
-        string jsonText = File.ReadAllText(path);
-        string wrappedJson = "{\"cards\":" + jsonText + "}";
+        string wrappedJson = "{\"cards\":" + json.text + "}";
 
         CardList cardList = JsonUtility.FromJson<CardList>(wrappedJson);
         Sprite backSprite = cardAtlas.GetSprite("Card_Back");

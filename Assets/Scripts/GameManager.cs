@@ -68,6 +68,10 @@ public class GameManager : MonoBehaviour
     // オブジェクトが破棄された時に非同期処理を安全に止めるためのトークン
     private CancellationToken _destroyToken;
 
+    // 局が変わった時に、前の局の非同期処理（上がり後に残る待機など）を止めるためのトークン
+    private CancellationTokenSource _roundCts;
+    private CancellationToken _roundToken;
+
     private void OnEnable()
     {
         Card.Clicked += OnCardSelected;
@@ -76,6 +80,12 @@ public class GameManager : MonoBehaviour
     private void OnDisable()
     {
         Card.Clicked -= OnCardSelected;
+    }
+
+    private void OnDestroy()
+    {
+        _roundCts?.Cancel();
+        _roundCts?.Dispose();
     }
 
     void Start()
@@ -97,6 +107,12 @@ public class GameManager : MonoBehaviour
     /// </summary>
     private void StartRound()
     {
+        _roundCts?.Cancel();
+        _roundCts?.Dispose();
+        _roundCts = CancellationTokenSource.CreateLinkedTokenSource(_destroyToken);
+        _roundToken = _roundCts.Token;
+        _onFlowCompleteCallback = null;
+
         _currentState = TurnState.PlayerTurn;
         _playerLastTotalPoints = 0;
         _enemyLastTotalPoints = 0;
@@ -321,9 +337,12 @@ public class GameManager : MonoBehaviour
 
     private async UniTaskVoid DrawFromDeckRoutineAsync(bool isPlayer)
     {
+        // 開始時点の局のトークンを保持する（途中で局が終わったら、この処理ごと止まる）
+        CancellationToken ct = _roundToken;
+
         _currentState = TurnState.CheckingMatch;
 
-        await UniTask.Delay(TimeSpan.FromSeconds(deckDrawAnticipationDelay), cancellationToken: _destroyToken);
+        await UniTask.Delay(TimeSpan.FromSeconds(deckDrawAnticipationDelay), cancellationToken: ct);
 
         if (deckController == null || deckController.Count == 0)
         {
@@ -343,7 +362,7 @@ public class GameManager : MonoBehaviour
         drawnCard.SetOnTop(true);
 
         // 🌟 山札の場所でくるっとめくって表向きにする。まだ場には加えない（一致判定＆選択が確定するまで待機させる）
-        await drawnCard.FlipAsync(true, deckFlipDuration, _destroyToken);
+        await drawnCard.FlipAsync(true, deckFlipDuration, ct);
 
         Debug.Log($"山札からめくった札: {drawnCard.Data.month}月 ({drawnCard.Data.type})");
 
@@ -353,7 +372,7 @@ public class GameManager : MonoBehaviour
             : new List<Card>();
 
         // 山札の場所でめくり演出を見せるための待機
-        await UniTask.Delay(TimeSpan.FromSeconds(deckCardRevealDelay), cancellationToken: _destroyToken);
+        await UniTask.Delay(TimeSpan.FromSeconds(deckCardRevealDelay), cancellationToken: ct);
 
         if (matchingFieldCards.Count > 0)
         {
@@ -372,7 +391,7 @@ public class GameManager : MonoBehaviour
                 _currentState = TurnState.SelectingDeckMatch;
                 HighlightMatchingFieldCards(drawnCard.Data.month);
 
-                await UniTask.WaitUntil(() => _selectedDeckMatchFieldCard != null, cancellationToken: _destroyToken);
+                await UniTask.WaitUntil(() => _selectedDeckMatchFieldCard != null, cancellationToken: ct);
 
                 matchingFieldCards = new List<Card> { _selectedDeckMatchFieldCard };
 
@@ -404,7 +423,7 @@ public class GameManager : MonoBehaviour
             foreach (Card fc in fieldView.Cards) fc.SetOnTop(false);
             fieldView.Rearrange();
         }
-        await UniTask.Delay(TimeSpan.FromSeconds(fieldRearrangeDelay), cancellationToken: _destroyToken);
+        await UniTask.Delay(TimeSpan.FromSeconds(fieldRearrangeDelay), cancellationToken: ct);
 
         bool isYakuFlowDone = false;
         CheckYakuAndProceed(isPlayer, () =>
@@ -412,7 +431,8 @@ public class GameManager : MonoBehaviour
             isYakuFlowDone = true;
         });
 
-        await UniTask.WaitUntil(() => isYakuFlowDone, cancellationToken: _destroyToken);
+        // 上がりで局が終わった場合は isYakuFlowDone が立たないが、局のトークンが取り消されてここで止まる
+        await UniTask.WaitUntil(() => isYakuFlowDone, cancellationToken: ct);
 
         if (IsHandsEmpty())
         {
@@ -455,6 +475,8 @@ public class GameManager : MonoBehaviour
     /// </summary>
     private async UniTask CollectCardsAsync(Card handCard, List<Card> fieldCards, bool isPlayer, bool shouldTriggerNextStep = true)
     {
+        CancellationToken ct = _roundToken;
+
         // 獲得処理が始まった瞬間に入力を締め切る（演出中に別の手札を出せてしまうのを防ぐ）
         _currentState = TurnState.CheckingMatch;
 
@@ -489,7 +511,7 @@ public class GameManager : MonoBehaviour
             // 3. 補間アニメーション
             handCard.MoveToLocalPositionAsync(overlapTargetPos, captureOverlapDuration, handCard.GetCancellationTokenOnDestroy()).Forget();
 
-            await UniTask.Delay(TimeSpan.FromSeconds(captureOverlapDuration + captureOverlapBuffer), cancellationToken: _destroyToken);
+            await UniTask.Delay(TimeSpan.FromSeconds(captureOverlapDuration + captureOverlapBuffer), cancellationToken: ct);
         }
 
         CapturedAreaView targetCapturedView = isPlayer ? playerCapturedView : enemyCapturedView;
@@ -504,7 +526,7 @@ public class GameManager : MonoBehaviour
         }
 
         float duration = (targetCapturedView != null) ? targetCapturedView.MoveDuration : captureAreaMoveFallbackDuration;
-        await UniTask.Delay(TimeSpan.FromSeconds(duration), cancellationToken: _destroyToken);
+        await UniTask.Delay(TimeSpan.FromSeconds(duration), cancellationToken: ct);
 
         if (shouldTriggerNextStep)
         {
@@ -664,8 +686,10 @@ public class GameManager : MonoBehaviour
 
     private async UniTaskVoid NPCTurnRoutineAsync()
     {
+        CancellationToken ct = _roundToken;
+
         Debug.Log("NPCが考えています...");
-        await UniTask.Delay(TimeSpan.FromSeconds(npcThinkDelay), cancellationToken: _destroyToken);
+        await UniTask.Delay(TimeSpan.FromSeconds(npcThinkDelay), cancellationToken: ct);
 
         Card npcChoice = null;
         List<Card> fieldChoices = new List<Card>();
@@ -708,7 +732,7 @@ public class GameManager : MonoBehaviour
 
                 enemyHandView.Rearrange(discard);
 
-                await UniTask.Delay(TimeSpan.FromSeconds(npcDiscardDelay), cancellationToken: _destroyToken);
+                await UniTask.Delay(TimeSpan.FromSeconds(npcDiscardDelay), cancellationToken: ct);
             }
             DrawFromDeckRoutineAsync(false).Forget();
         }

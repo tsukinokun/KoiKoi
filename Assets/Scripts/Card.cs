@@ -21,7 +21,9 @@ public class Card : MonoBehaviour
     [SerializeField] private GameObject glowObject; // エフェクトオブジェクトをUnity上で紐付ける枠
 
     // 🌟移動中かどうかを判定するフラグ（移動中にクリックされるのを防ぐなどの用途に）
-    public bool IsMoving { get; private set; } = false;
+    // 移動・めくり演出が重なっても、全部終わるまで「移動中」とみなすために実行中の数で管理する
+    private int _activeTweenCount = 0;
+    public bool IsMoving => _activeTweenCount > 0;
 
     // カードの描画順
     // （畳=0 ＜ 山札(裏向き)=10 ＜ 場札・獲得札(表向き)=20 ＜ 手札(表裏問わず)=25 ＜ 出した札・めくった札=30 ＜ カットイン=100 ＜ 各種ウィンドウ=150）
@@ -148,35 +150,39 @@ public class Card : MonoBehaviour
     /// </summary>
     public async UniTask FlipAsync(bool isFaceUp, float duration, CancellationToken cancellationToken = default)
     {
-        IsMoving = true;
-
-        float half = duration / 2f;
-
-        float elapsed = 0f;
-        while (elapsed < half)
+        _activeTweenCount++;
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            elapsed += Time.deltaTime;
-            float angle = Mathf.SmoothStep(0f, 90f, elapsed / half);
-            transform.localRotation = Quaternion.Euler(0f, angle, 0f);
-            await UniTask.Yield(PlayerLoopTiming.Update, cancellationToken);
+            float half = duration / 2f;
+
+            float elapsed = 0f;
+            while (elapsed < half)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                elapsed += Time.deltaTime;
+                float angle = Mathf.SmoothStep(0f, 90f, elapsed / half);
+                transform.localRotation = Quaternion.Euler(0f, angle, 0f);
+                await UniTask.Yield(PlayerLoopTiming.Update, cancellationToken);
+            }
+            transform.localRotation = Quaternion.Euler(0f, 90f, 0f);
+
+            SetFaceUp(isFaceUp);
+
+            elapsed = 0f;
+            while (elapsed < half)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                elapsed += Time.deltaTime;
+                float angle = Mathf.SmoothStep(90f, 0f, elapsed / half);
+                transform.localRotation = Quaternion.Euler(0f, angle, 0f);
+                await UniTask.Yield(PlayerLoopTiming.Update, cancellationToken);
+            }
+            transform.localRotation = Quaternion.identity;
         }
-        transform.localRotation = Quaternion.Euler(0f, 90f, 0f);
-
-        SetFaceUp(isFaceUp);
-
-        elapsed = 0f;
-        while (elapsed < half)
+        finally
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            elapsed += Time.deltaTime;
-            float angle = Mathf.SmoothStep(90f, 0f, elapsed / half);
-            transform.localRotation = Quaternion.Euler(0f, angle, 0f);
-            await UniTask.Yield(PlayerLoopTiming.Update, cancellationToken);
+            _activeTweenCount--;
         }
-        transform.localRotation = Quaternion.identity;
-
-        IsMoving = false;
     }
 
     /// <summary>
@@ -187,31 +193,37 @@ public class Card : MonoBehaviour
     /// <param name="cancellationToken">GameObjectが破棄された時にタスクを安全に止めるためのトークン</param>
     public async UniTask MoveToPositionAsync(Vector3 targetWorldPosition, float duration, CancellationToken cancellationToken = default)
     {
-        IsMoving = true;
-        Vector3 startPosition = transform.position;
-        float elapsedTime = 0f;
-
-        while (elapsedTime < duration)
+        _activeTweenCount++;
+        try
         {
-            // 途中でゲーム終了やシーン遷移、オブジェクト破棄があったら安全に抜ける
-            cancellationToken.ThrowIfCancellationRequested();
+            Vector3 startPosition = transform.position;
+            float elapsedTime = 0f;
 
-            elapsedTime += Time.deltaTime;
-            float t = elapsedTime / duration;
+            while (elapsedTime < duration)
+            {
+                // 途中でゲーム終了やシーン遷移、オブジェクト破棄があったら安全に抜ける
+                cancellationToken.ThrowIfCancellationRequested();
 
-            // イージング（SmoothStepで加速・減速を滑らかに）
-            t = Mathf.SmoothStep(0f, 1f, t);
+                elapsedTime += Time.deltaTime;
+                float t = elapsedTime / duration;
 
-            // ワールド座標を補間
-            transform.position = Vector3.Lerp(startPosition, targetWorldPosition, t);
+                // イージング（SmoothStepで加速・減速を滑らかに）
+                t = Mathf.SmoothStep(0f, 1f, t);
 
-            // Unityの通常のUpdateタイミングまで1フレーム待機
-            await UniTask.Yield(PlayerLoopTiming.Update, cancellationToken);
+                // ワールド座標を補間
+                transform.position = Vector3.Lerp(startPosition, targetWorldPosition, t);
+
+                // Unityの通常のUpdateタイミングまで1フレーム待機
+                await UniTask.Yield(PlayerLoopTiming.Update, cancellationToken);
+            }
+
+            // 最後に確実に目標座標に合わせる
+            transform.position = targetWorldPosition;
         }
-
-        // 最後に確実に目標座標に合わせる
-        transform.position = targetWorldPosition;
-        IsMoving = false;
+        finally
+        {
+            _activeTweenCount--;
+        }
     }
 
     /// <summary>
@@ -219,28 +231,34 @@ public class Card : MonoBehaviour
     /// </summary>
     public async UniTask MoveToLocalPositionAsync(Vector3 targetLocalPosition, float duration, CancellationToken cancellationToken = default)
     {
-        IsMoving = true;
-        Vector3 startPosition = transform.localPosition; // 💡localPosition を使用
-        float elapsedTime = 0f;
-
-        while (elapsedTime < duration)
+        _activeTweenCount++;
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
+            Vector3 startPosition = transform.localPosition; // 💡localPosition を使用
+            float elapsedTime = 0f;
 
-            elapsedTime += Time.deltaTime;
-            float t = elapsedTime / duration;
+            while (elapsedTime < duration)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
 
-            // イージング（SmoothStep）
-            t = Mathf.SmoothStep(0f, 1f, t);
+                elapsedTime += Time.deltaTime;
+                float t = elapsedTime / duration;
 
-            // 💡ローカル座標を補間
-            transform.localPosition = Vector3.Lerp(startPosition, targetLocalPosition, t);
+                // イージング（SmoothStep）
+                t = Mathf.SmoothStep(0f, 1f, t);
 
-            await UniTask.Yield(PlayerLoopTiming.Update, cancellationToken);
+                // 💡ローカル座標を補間
+                transform.localPosition = Vector3.Lerp(startPosition, targetLocalPosition, t);
+
+                await UniTask.Yield(PlayerLoopTiming.Update, cancellationToken);
+            }
+
+            // 最後に確実に目標のローカル座標に合わせる
+            transform.localPosition = targetLocalPosition;
         }
-
-        // 最後に確実に目標のローカル座標に合わせる
-        transform.localPosition = targetLocalPosition;
-        IsMoving = false;
+        finally
+        {
+            _activeTweenCount--;
+        }
     }
 }
