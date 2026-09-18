@@ -18,7 +18,8 @@ public static class YakuEvaluator
         // type名が "Tan" と "Tanzaku" のどちらでもヒットするように小文字にして判定
         int tanzakuCount = capturedCards.Count(c => c.type.ToLower() == "tan" || c.type.ToLower() == "tanzaku");
 
-        bool hasAme = capturedCards.Any(c => c.tags.Contains("Ame"));
+        // "Ame" は柳の燕・柳の短冊にも付いているため、光札（小野道風）に限定して判定する
+        bool hasAme = capturedCards.Any(c => c.type == "Hikari" && c.tags.Contains("Ame"));
         bool hasSakazuki = capturedCards.Any(c => c.tags.Contains("Sakazuki"));
 
         int inoshikachoCount = capturedCards.Count(c => c.tags.Contains("Inoshikacho"));

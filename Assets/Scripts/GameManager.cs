@@ -455,6 +455,9 @@ public class GameManager : MonoBehaviour
     /// </summary>
     private async UniTask CollectCardsAsync(Card handCard, List<Card> fieldCards, bool isPlayer, bool shouldTriggerNextStep = true)
     {
+        // 獲得処理が始まった瞬間に入力を締め切る（演出中に別の手札を出せてしまうのを防ぐ）
+        _currentState = TurnState.CheckingMatch;
+
         if (handCard != null && fieldCards != null && fieldCards.Count > 0)
         {
             Card overlapTargetCard = fieldCards[0];

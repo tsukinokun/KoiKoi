@@ -25,6 +25,11 @@ public class DeckController : MonoBehaviour
     /// </summary>
     public void InitializeDeck()
     {
+        // 前局で使われなかった山札のカードを破棄する（参照を消すだけだとGameObjectが残り続ける）
+        foreach (Card card in _deck)
+        {
+            if (card != null) Destroy(card.gameObject);
+        }
         _deck.Clear();
 
         string path = Path.Combine(Application.streamingAssetsPath, "JSON", "cards_master.json");
