@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.U2D;
 
@@ -20,6 +21,11 @@ public class DeckController : MonoBehaviour
     /// 現在の山札の残り枚数
     /// </summary>
     public int Count => _deck.Count;
+
+    /// <summary>
+    /// 山札に残っている札のデータ（敵AIが「まだ見えていない札」を数えるために使う。順番は使わない）
+    /// </summary>
+    public IEnumerable<CardData> RemainingCardData => _deck.Select(c => c.Data);
 
     /// <summary>
     /// JSONからカードマスターを読み込み、48枚の山札を生成してシャッフルする

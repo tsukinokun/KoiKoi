@@ -65,6 +65,9 @@ public class GameManager : MonoBehaviour
 
     private int _tempCurrentPoints = 0;
 
+    // 敵AI（タイトルで選んだ強さで思考する）
+    private NpcBrain _npcBrain;
+
     // オブジェクトが破棄された時に非同期処理を安全に止めるためのトークン
     private CancellationToken _destroyToken;
 
@@ -96,6 +99,9 @@ public class GameManager : MonoBehaviour
 
         GameSession.TotalRounds = Mathf.Max(1, GameSession.TotalRounds);
         GameSession.CurrentRound = Mathf.Clamp(GameSession.CurrentRound, 1, GameSession.TotalRounds);
+
+        _npcBrain = new NpcBrain(GameSession.Difficulty, new System.Random());
+        Debug.Log($"敵の強さ: {GameSession.Difficulty}");
 
         UpdateScoreLedger();
 
@@ -403,9 +409,17 @@ public class GameManager : MonoBehaviour
                 _selectedDeckMatchFieldCard = null;
                 _currentState = TurnState.CheckingMatch;
             }
+            else if (matchingFieldCards.Count == 2)
+            {
+                // NPCの番で2枚一致した場合は、敵AIがどちらを取るか選ぶ
+                CardData chosen = _npcBrain.ChooseDeckMatch(
+                    BuildEnemySnapshot(), drawnCard.Data, matchingFieldCards.Select(c => c.Data).ToList());
+                Card chosenCard = matchingFieldCards.FirstOrDefault(c => c.Data == chosen) ?? matchingFieldCards[0];
+                Debug.Log($"【山札めくり一致】{drawnCard.Data.month}月が場札と一致！NPCが {chosenCard.Data.id} を獲得します。");
+                matchingFieldCards = new List<Card> { chosenCard };
+            }
             else
             {
-                // NPCの番、または1枚のみ一致（2枚の時はルール上どれを貰っても同じなので最初の1枚を選択）
                 Debug.Log($"【山札めくり一致】{drawnCard.Data.month}月が場札と一致！獲得します。");
                 matchingFieldCards = new List<Card> { matchingFieldCards[0] };
             }
@@ -600,6 +614,14 @@ public class GameManager : MonoBehaviour
             _onFlowCompleteCallback = onComplete;
             OpenKoiKoiWindow(currentTotalPoints);
         }
+        else if (enemyHandView != null && enemyHandView.Cards.Any()
+                 && _npcBrain.ShouldKoiKoi(BuildEnemySnapshot(), currentTotalPoints))
+        {
+            audioManager?.PlayEnemyKoiKoiVoice();
+            Debug.Log($"NPCがこいこいしました！（現在 {currentTotalPoints}文）");
+            _enemyLastTotalPoints = currentTotalPoints;
+            onComplete?.Invoke();
+        }
         else
         {
             audioManager?.PlayEnemyAgariVoice();
@@ -705,37 +727,23 @@ public class GameManager : MonoBehaviour
 
         if (fieldView != null && enemyHandView != null)
         {
-            foreach (Card npcCard in enemyHandView.Cards)
-            {
-                List<Card> matches = GetMatchingFieldCards(npcCard.Data.month);
-                if (matches.Count > 0)
-                {
-                    npcChoice = npcCard;
-                    fieldChoices = matches;
-                    break;
-                }
-            }
+            // 敵AIが、出す手札と取る場札（3枚なら総取り）を決める。取る札がなければ捨て札になる
+            (CardData hand, List<CardData> takes) = _npcBrain.ChooseHandMove(BuildEnemySnapshot());
+            npcChoice = enemyHandView.Cards.FirstOrDefault(c => c.Data == hand);
+            fieldChoices = fieldView.Cards.Where(c => takes.Contains(c.Data)).ToList();
         }
 
         if (npcChoice != null && fieldChoices.Count > 0)
         {
             audioManager?.PlayEnemyVoice();
-            // 🌟 NPCの処理も3枚場に出ている時は総取りルーチンへ分岐させる
-            if (fieldChoices.Count == 3)
-            {
-                await CollectCardsAsync(npcChoice, fieldChoices, false);
-            }
-            else
-            {
-                await CollectCardsAsync(npcChoice, new List<Card> { fieldChoices[0] }, false);
-            }
+            await CollectCardsAsync(npcChoice, fieldChoices, false);
         }
         else
         {
             if (enemyHandView != null && enemyHandView.transform.childCount > 0)
             {
                 audioManager?.PlayEnemyVoice();
-                Card discard = enemyHandView.transform.GetChild(0).GetComponent<Card>();
+                Card discard = npcChoice != null ? npcChoice : enemyHandView.transform.GetChild(0).GetComponent<Card>();
                 discard.SetOnTop(true);
                 if (fieldView != null) fieldView.AddCard(discard, true);
 
@@ -745,6 +753,28 @@ public class GameManager : MonoBehaviour
             }
             DrawFromDeckRoutineAsync(false).Forget();
         }
+    }
+
+    /// <summary>
+    /// 敵AIに渡す盤面情報を作る（プレイヤーの手札と山札は「見えていない札」としてまとめ、区別しない）
+    /// </summary>
+    private BoardSnapshot BuildEnemySnapshot()
+    {
+        var snapshot = new BoardSnapshot();
+        if (enemyHandView != null) snapshot.OwnHand.AddRange(enemyHandView.Cards.Select(c => c.Data));
+        if (fieldView != null) snapshot.Field.AddRange(fieldView.Cards.Select(c => c.Data));
+        if (enemyCapturedView != null) snapshot.OwnCaptured.AddRange(enemyCapturedView.Cards.Select(c => c.Data));
+        if (playerCapturedView != null) snapshot.OpponentCaptured.AddRange(playerCapturedView.Cards.Select(c => c.Data));
+
+        if (playerHandView != null)
+        {
+            List<CardData> playerHand = playerHandView.Cards.Select(c => c.Data).ToList();
+            snapshot.OpponentHandCount = playerHand.Count;
+            snapshot.Unknown.AddRange(playerHand);
+        }
+        if (deckController != null) snapshot.Unknown.AddRange(deckController.RemainingCardData);
+
+        return snapshot;
     }
 
     private List<YakuResult> CheckAllYaku(bool isPlayer)
