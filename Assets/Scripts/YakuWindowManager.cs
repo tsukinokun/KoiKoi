@@ -14,6 +14,9 @@ public class YakuWindowManager : MonoBehaviour
     // UIが閉じられたことをGameManagerに伝えるためのコールバック
     private Action _onCloseCallback;
 
+    // ウィンドウを開いたフレーム（開いたのと同じクリックで、すぐ閉じてしまわないようにする）
+    private int _shownFrame = -1;
+
     private void Awake()
     {
         // 初期状態では確実に非表示にしておく
@@ -50,6 +53,7 @@ public class YakuWindowManager : MonoBehaviour
 
         // コールバックの登録
         _onCloseCallback = onClose;
+        _shownFrame = Time.frameCount;
 
         // ウィンドウをアクティブにする
         windowRoot.SetActive(true);
@@ -84,6 +88,7 @@ public class YakuWindowManager : MonoBehaviour
         }
 
         _onCloseCallback = onClose;
+        _shownFrame = Time.frameCount;
         windowRoot.SetActive(true);
     }
 
@@ -111,6 +116,7 @@ public class YakuWindowManager : MonoBehaviour
         }
 
         _onCloseCallback = onClose;
+        _shownFrame = Time.frameCount;
         windowRoot.SetActive(true);
     }
 
@@ -121,9 +127,12 @@ public class YakuWindowManager : MonoBehaviour
             windowRoot.SetActive(false);
         }
 
-        // 登録されていた終了時処理（GameManager側の次のターン遷移など）を実行
-        _onCloseCallback?.Invoke();
+        // 登録されていた終了時処理（GameManager側の次のターン遷移など）を実行する。
+        // 処理の中で次のウィンドウ（精算など）が開くことがあるので、先に取り出して消してから呼ぶ
+        // （呼んだ後に消すと、次のウィンドウ用に登録したコールバックまで消えて先に進めなくなる）
+        Action callback = _onCloseCallback;
         _onCloseCallback = null;
+        callback?.Invoke();
     }
 
     private void Update()
@@ -133,7 +142,7 @@ public class YakuWindowManager : MonoBehaviour
 
         if (windowRoot != null && windowRoot.activeSelf)
         {
-            if (Input.GetMouseButtonDown(0))
+            if (Input.GetMouseButtonDown(0) && Time.frameCount != _shownFrame)
             {
                 CloseWindow();
             }
