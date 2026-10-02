@@ -44,6 +44,8 @@ public class CutInPresenter : MonoBehaviour
     [SerializeField] private float yakuEntryFadeDuration = 0.3f;
     [SerializeField] private float yakuEntryStagger = 0.4f;
     [SerializeField] private float postRevealHoldDelay = 0.6f;
+    [SerializeField] private CanvasGroup yakuListBackplate; // 役テキストの後ろに敷く半透明の板（あらかじめ非アクティブにしておく）
+    [SerializeField] private float backplateFadeDuration = 0.2f;
 
     private readonly List<GameObject> _spawnedYakuEntries = new List<GameObject>();
 
@@ -159,6 +161,12 @@ public class CutInPresenter : MonoBehaviour
     {
         if (yakuListContainer == null || yakuEntryTemplate == null || yakuResults == null) return;
 
+        if (yakuListBackplate != null)
+        {
+            yakuListBackplate.gameObject.SetActive(true);
+            await FadeCanvasGroupAsync(yakuListBackplate, 0f, 1f, backplateFadeDuration, cancellationToken);
+        }
+
         for (int i = 0; i < yakuResults.Count; i++)
         {
             YakuResult yaku = yakuResults[i];
@@ -203,5 +211,11 @@ public class CutInPresenter : MonoBehaviour
             if (entry != null) Destroy(entry);
         }
         _spawnedYakuEntries.Clear();
+
+        if (yakuListBackplate != null)
+        {
+            yakuListBackplate.alpha = 0f;
+            yakuListBackplate.gameObject.SetActive(false);
+        }
     }
 }
