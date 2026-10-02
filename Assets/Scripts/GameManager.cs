@@ -586,7 +586,13 @@ public class GameManager : MonoBehaviour
             await tcs.Task;
         }
 
-        if (isPlayer)
+        if (isPlayer && (playerHandView == null || !playerHandView.Cards.Any()))
+        {
+            // プレイヤーの最終ターン（手札0枚）で役ができた場合は、次の手番がないのでこいこいは選べず強制的に上がり
+            Debug.Log("プレイヤーの最終ターンのため、こいこいできません。強制的に上がりです。");
+            OnAgariSelected();
+        }
+        else if (isPlayer)
         {
             _onFlowCompleteCallback = onComplete;
             OpenKoiKoiWindow(currentTotalPoints);
