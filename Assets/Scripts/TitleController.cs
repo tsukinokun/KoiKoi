@@ -47,6 +47,7 @@ public class TitleController : MonoBehaviour
         GameSession.CurrentRound = 1;
         GameSession.PlayerScore = 0;
         GameSession.EnemyScore = 0;
+        GameSession.DealerDecided = false;
 
         SceneManager.LoadScene("InGameScene");
     }

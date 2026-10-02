@@ -12,6 +12,7 @@ public sealed class BoardSnapshot
     public List<CardData> OwnCaptured = new List<CardData>();
     public List<CardData> OpponentCaptured = new List<CardData>();
     public int OpponentHandCount;
+    public bool OpponentCalledKoiKoi; // 相手がこいこい中なら、こちらが上がると2倍になる
 
     // まだ見えていない札（相手の手札＋山札）。どれが相手の手札かは区別しない
     public List<CardData> Unknown = new List<CardData>();
@@ -120,6 +121,9 @@ public sealed class NpcBrain
     {
         if (_difficulty != NpcDifficulty.Strong) return false;
         EnsureTotalCounts(s);
+
+        // 相手がこいこい中なら、今上がればこいこい返しで2倍になる
+        if (s.OpponentCalledKoiKoi) return false;
         if (s.OwnHand.Count < KoiMinHand) return false;
         if (currentPoints > KoiMaxPoints) return false;
 

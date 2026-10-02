@@ -8,4 +8,8 @@ public static class GameSession
     public static int PlayerScore = 0;
     public static int EnemyScore = 0;
     public static NpcDifficulty Difficulty = NpcDifficulty.Normal;
+
+    // 親（先手）。最初の局で札を引いて決め、以降は上がった側が次の局の親になる
+    public static bool PlayerIsDealer = true;
+    public static bool DealerDecided = false;
 }

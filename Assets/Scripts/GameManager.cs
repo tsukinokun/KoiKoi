@@ -37,6 +37,7 @@ public class GameManager : MonoBehaviour
     [SerializeField] private CutInPresenter cutInPresenter;
     [SerializeField] private YakuWindowManager yakuWindowManager;
     [SerializeField] private ScoreLedger scoreLedger;
+    [SerializeField] private AnnouncementPresenter announcementPresenter;
 
     [Header("Initial Deal Settings")]
     [SerializeField] private int initialHandCount = 8;  // お互いの初期手札枚数
@@ -52,9 +53,20 @@ public class GameManager : MonoBehaviour
     [SerializeField] private float captureAreaMoveFallbackDuration = 0.4f; // 獲得エリアViewが未設定の場合のフォールバック
     [SerializeField] private float npcThinkDelay = 1.5f;             // NPCが「考えている」演出時間
     [SerializeField] private float npcDiscardDelay = 0.4f;           // NPCが場に捨てた後の間
+    [SerializeField] private float dealSettleDelay = 0.6f;           // 配り終えてから手役・配り直しを判定するまでの間
+    [SerializeField] private float announcementDuration = 1.4f;      // 告知（親決め・配り直し・手役）を見せる時間
+    [SerializeField] private float dealerCardMoveDuration = 0.4f;    // 親決めの札を中央へ動かす時間
+    [SerializeField] private Vector3 dealerCardOffset = new Vector3(0f, 2.1f, 0f); // 親決めの札を場の中心から上下にずらす量（告知の帯と重ならない位置）
 
     [Header("Capture Animation")]
     [SerializeField] private Vector3 captureOverlapOffset = new Vector3(0.15f, -0.15f, -0.05f);
+
+    [Header("Debug（エディタと Development Build でのみ有効）")]
+    [Tooltip("配る札を指定して、手四・くっつき・場札の配り直し・敵の親などを再現する")]
+    [SerializeField] private DebugDealPreset debugDealPreset = DebugDealPreset.None;
+
+    // 場札に同じ月が4枚そろい続けた場合の配り直しの上限（無限ループ防止）
+    private const int MaxRedealCount = 10;
 
     // 次のターンへ進むためのコールバック保持用
     private System.Action _onFlowCompleteCallback;
@@ -64,6 +76,10 @@ public class GameManager : MonoBehaviour
     private int _enemyLastTotalPoints = 0;
 
     private int _tempCurrentPoints = 0;
+
+    // この局でこいこいしたか（相手がこいこい中に上がると、こいこい返しで2倍になる）
+    private bool _playerCalledKoiKoi;
+    private bool _enemyCalledKoiKoi;
 
     // 敵AI（タイトルで選んだ強さで思考する）
     private NpcBrain _npcBrain;
@@ -105,41 +121,207 @@ public class GameManager : MonoBehaviour
 
         UpdateScoreLedger();
 
-        StartRound();
+        StartRoundAsync().Forget();
     }
 
     /// <summary>
     /// 1局（ラウンド）分の対局を初期化して開始する。複数局の対局モードでは局が変わるたびに呼び直す
     /// </summary>
-    private void StartRound()
+    private async UniTaskVoid StartRoundAsync()
     {
         _roundCts?.Cancel();
         _roundCts?.Dispose();
         _roundCts = CancellationTokenSource.CreateLinkedTokenSource(_destroyToken);
         _roundToken = _roundCts.Token;
+        CancellationToken ct = _roundToken;
         _onFlowCompleteCallback = null;
 
-        _currentState = TurnState.PlayerTurn;
+        // 配り終えて先手が決まるまでは操作を受け付けない
+        _currentState = TurnState.CheckingMatch;
         _playerLastTotalPoints = 0;
         _enemyLastTotalPoints = 0;
+        _playerCalledKoiKoi = false;
+        _enemyCalledKoiKoi = false;
 
+        ClearBoard();
+
+        // 1️⃣ 最初の局だけ、札を引いて親（先手）を決める
+        if (!GameSession.DealerDecided)
+        {
+            await DecideDealerAsync(ct);
+            GameSession.DealerDecided = true;
+        }
+        UpdateStatusBadges();
+
+        // 2️⃣ 配る。場札に同じ月が4枚そろったら配り直す（デバッグ指定は最初の配りにだけ使う）
+        for (int dealCount = 0; ; dealCount++)
+        {
+            deckController.InitializeDeck();
+            if (dealCount == 0) ApplyDebugDealOrder();
+            DealInitialCards();
+
+            await UniTask.Delay(TimeSpan.FromSeconds(dealSettleDelay), cancellationToken: ct);
+
+            bool needsRedeal = fieldView != null && KoiKoiRules.HasFourOfAMonth(fieldView.Cards.Select(c => c.Data));
+            if (!needsRedeal || dealCount >= MaxRedealCount) break;
+
+            await AnnounceAsync("場札に同じ月が4枚そろったので、配り直します", ct);
+            ClearBoard();
+        }
+
+        // 3️⃣ 手四・くっつきがあれば、その場で上がり（両方にあれば親が優先）
+        if (await TrySettleHandYakuAsync(ct)) return;
+
+        // 4️⃣ 親から打ち始める
+        if (GameSession.PlayerIsDealer)
+        {
+            _currentState = TurnState.PlayerTurn;
+            HighlightMatchableCards();
+        }
+        else
+        {
+            _currentState = TurnState.NPCTurn;
+            NPCTurnRoutineAsync().Forget();
+        }
+    }
+
+    private void ClearBoard()
+    {
         // 前局のカードが残っていればすべて破棄してからボードをリセットする
         playerHandView?.Clear();
         enemyHandView?.Clear();
         fieldView?.Clear();
         playerCapturedView?.Clear();
         enemyCapturedView?.Clear();
+    }
 
-        if (deckController != null)
+    /// <summary>
+    /// お互いに山札から1枚ずつ引き、月が早いほうを親にする。同じ月なら引き直す
+    /// </summary>
+    private async UniTask DecideDealerAsync(CancellationToken ct)
+    {
+        Vector3 center = fieldView != null ? fieldView.transform.position : Vector3.zero;
+
+        while (true)
         {
             deckController.InitializeDeck();
+            if (ActiveDebugPreset != DebugDealPreset.None)
+            {
+                deckController.ForceDrawOrder(KoiKoiRules.BuildDebugDealerDrawOrder(ActiveDebugPreset));
+            }
+
+            Card playerCard = deckController.DrawCard();
+            Card enemyCard = deckController.DrawCard();
+            try
+            {
+                playerCard.SetOnTop(true);
+                enemyCard.SetOnTop(true);
+
+                await UniTask.WhenAll(
+                    playerCard.MoveToPositionAsync(center - dealerCardOffset, dealerCardMoveDuration, ct),
+                    enemyCard.MoveToPositionAsync(center + dealerCardOffset, dealerCardMoveDuration, ct));
+                await UniTask.WhenAll(
+                    playerCard.FlipAsync(true, deckFlipDuration, ct),
+                    enemyCard.FlipAsync(true, deckFlipDuration, ct));
+                await UniTask.Delay(TimeSpan.FromSeconds(deckCardRevealDelay), cancellationToken: ct);
+
+                int playerMonth = playerCard.Data.month;
+                int enemyMonth = enemyCard.Data.month;
+                if (playerMonth == enemyMonth)
+                {
+                    await AnnounceAsync($"どちらも{playerMonth}月なので、引き直します", ct);
+                    continue;
+                }
+
+                GameSession.PlayerIsDealer = playerMonth < enemyMonth;
+                string dealer = GameSession.PlayerIsDealer ? "あなた" : "相手";
+                await AnnounceAsync($"あなた {playerMonth}月 / 相手 {enemyMonth}月\n{dealer}が親（先手）です", ct);
+                return;
+            }
+            finally
+            {
+                // 引いた札は使わない（この後の InitializeDeck で48枚を作り直す）
+                if (playerCard != null) Destroy(playerCard.gameObject);
+                if (enemyCard != null) Destroy(enemyCard.gameObject);
+            }
+        }
+    }
+
+    /// <summary>
+    /// 配られた手札に手四・くっつきがあれば、6文で上がりにする。上がった場合は true
+    /// </summary>
+    private async UniTask<bool> TrySettleHandYakuAsync(CancellationToken ct)
+    {
+        HandYaku playerYaku = KoiKoiRules.DetectHandYaku(playerHandView.Cards.Select(c => c.Data));
+        HandYaku enemyYaku = KoiKoiRules.DetectHandYaku(enemyHandView.Cards.Select(c => c.Data));
+        if (playerYaku == HandYaku.None && enemyYaku == HandYaku.None) return false;
+
+        bool playerWins = playerYaku != HandYaku.None && (enemyYaku == HandYaku.None || GameSession.PlayerIsDealer);
+        HandYaku yaku = playerWins ? playerYaku : enemyYaku;
+        string yakuName = KoiKoiRules.HandYakuName(yaku);
+
+        // 敵の手役は、手札を表に返して見せる
+        if (!playerWins)
+        {
+            foreach (Card card in enemyHandView.Cards) card.SetFaceUp(true);
         }
 
-        // カードが内部的にドローされて各Viewの子要素に収まる
-        DealInitialCards();
+        if (playerWins) audioManager?.PlayPlayerAgariVoice();
+        else audioManager?.PlayEnemyAgariVoice();
 
-        // ラウンド開始時、プレイヤーの最初の手札のエフェクトをチェック
-        HighlightMatchableCards();
+        await AnnounceAsync($"{(playerWins ? "あなた" : "相手")}の{yakuName}！", ct);
+        await ShowSettlementAsync(new List<string> { $"{yakuName}  {KoiKoiRules.HandYakuPoints}文" }, KoiKoiRules.HandYakuPoints);
+
+        EndRound(isDraw: false, isPlayerWinner: playerWins, points: KoiKoiRules.HandYakuPoints);
+        return true;
+    }
+
+    private async UniTask AnnounceAsync(string message, CancellationToken ct)
+    {
+        Debug.Log($"[告知] {message.Replace("\n", " ")}");
+        if (announcementPresenter != null)
+        {
+            await announcementPresenter.ShowAsync(message, announcementDuration, ct);
+        }
+    }
+
+    private async UniTask ShowSettlementAsync(List<string> lines, int total)
+    {
+        if (yakuWindowManager == null) return;
+
+        var tcs = new UniTaskCompletionSource();
+        yakuWindowManager.ShowSettlement(lines, total, () => tcs.TrySetResult());
+        await tcs.Task;
+    }
+
+    private void UpdateStatusBadges()
+    {
+        scoreLedger?.SetStatus(GameSession.PlayerIsDealer, _playerCalledKoiKoi, _enemyCalledKoiKoi);
+    }
+
+    private DebugDealPreset ActiveDebugPreset
+    {
+        get
+        {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            return debugDealPreset;
+#else
+            return DebugDealPreset.None;
+#endif
+        }
+    }
+
+    private void ApplyDebugDealOrder()
+    {
+        DebugDealPreset preset = ActiveDebugPreset;
+        if (preset == DebugDealPreset.None || deckController == null) return;
+
+        List<string> order = KoiKoiRules.BuildDebugDrawOrder(
+            preset, deckController.RemainingCardData, initialHandCount, initialFieldCount);
+        if (order == null) return;
+
+        Debug.LogWarning($"[Debug] 配る札を {preset} 用に並べ替えます。");
+        deckController.ForceDrawOrder(order);
     }
 
     private void DealInitialCards()
@@ -620,6 +802,8 @@ public class GameManager : MonoBehaviour
             audioManager?.PlayEnemyKoiKoiVoice();
             Debug.Log($"NPCがこいこいしました！（現在 {currentTotalPoints}文）");
             _enemyLastTotalPoints = currentTotalPoints;
+            _enemyCalledKoiKoi = true;
+            UpdateStatusBadges();
             onComplete?.Invoke();
         }
         else
@@ -653,6 +837,8 @@ public class GameManager : MonoBehaviour
         if (koiKoiChoicePanel != null) koiKoiChoicePanel.SetActive(false);
 
         _playerLastTotalPoints = _tempCurrentPoints;
+        _playerCalledKoiKoi = true;
+        UpdateStatusBadges();
 
         _onFlowCompleteCallback?.Invoke();
         _onFlowCompleteCallback = null;
@@ -669,8 +855,29 @@ public class GameManager : MonoBehaviour
 
     private void OnGameEnd(bool isPlayerWinner)
     {
-        int points = CheckAllYaku(isPlayerWinner).Sum(y => y.Points);
-        EndRound(isDraw: false, isPlayerWinner: isPlayerWinner, points: points);
+        SettleAndEndRoundAsync(isPlayerWinner).Forget();
+    }
+
+    /// <summary>
+    /// 役の合計に倍付け（7文以上・こいこい返し）をかけて精算し、局を終える
+    /// </summary>
+    private async UniTaskVoid SettleAndEndRoundAsync(bool isPlayerWinner)
+    {
+        _currentState = TurnState.CheckingMatch;
+
+        List<YakuResult> yakus = CheckAllYaku(isPlayerWinner);
+        bool opponentCalledKoiKoi = isPlayerWinner ? _enemyCalledKoiKoi : _playerCalledKoiKoi;
+        Settlement settlement = KoiKoiRules.CalculateSettlement(yakus.Sum(y => y.Points), opponentCalledKoiKoi);
+
+        // 倍付けがあるときだけ、内訳を見せる（倍付けなしなら役ウィンドウで表示済み）
+        if (settlement.Multiplier > 1)
+        {
+            List<string> lines = yakus.Select(y => $"{y.Name}  {y.Points}文").ToList();
+            lines.AddRange(settlement.Notes);
+            await ShowSettlementAsync(lines, settlement.Total);
+        }
+
+        EndRound(isDraw: false, isPlayerWinner: isPlayerWinner, points: settlement.Total);
     }
 
     /// <summary>
@@ -698,11 +905,14 @@ public class GameManager : MonoBehaviour
 
         UpdateScoreLedger();
 
+        // 上がった側が次の局の親になる（流局なら親はそのまま）
+        if (!isDraw) GameSession.PlayerIsDealer = isPlayerWinner;
+
         GameSession.CurrentRound++;
 
         if (GameSession.CurrentRound <= GameSession.TotalRounds)
         {
-            StartRound();
+            StartRoundAsync().Forget();
         }
         else
         {
@@ -770,6 +980,7 @@ public class GameManager : MonoBehaviour
         {
             List<CardData> playerHand = playerHandView.Cards.Select(c => c.Data).ToList();
             snapshot.OpponentHandCount = playerHand.Count;
+            snapshot.OpponentCalledKoiKoi = _playerCalledKoiKoi;
             snapshot.Unknown.AddRange(playerHand);
         }
         if (deckController != null) snapshot.Unknown.AddRange(deckController.RemainingCardData);

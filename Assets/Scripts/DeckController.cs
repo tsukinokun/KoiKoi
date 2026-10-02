@@ -93,6 +93,27 @@ public class DeckController : MonoBehaviour
     }
 
     /// <summary>
+    /// （デバッグ用）指定したIDの札が、その順番で引かれるように山札を並べ替える。指定のない札の順番はそのまま
+    /// </summary>
+    public void ForceDrawOrder(IList<string> idsInDrawOrder)
+    {
+        if (idsInDrawOrder == null) return;
+
+        // DrawCard は末尾から引くので、最初に引かせたい札が末尾に来るように逆順で積む
+        foreach (string id in idsInDrawOrder.Reverse())
+        {
+            Card card = _deck.FirstOrDefault(c => c.Data.id == id);
+            if (card == null)
+            {
+                Debug.LogWarning($"ForceDrawOrder: 山札に {id} が見つかりません。");
+                continue;
+            }
+            _deck.Remove(card);
+            _deck.Add(card);
+        }
+    }
+
+    /// <summary>
     /// 山札の上からカードを1枚引き、山札から削除して返す
     /// </summary>
     public Card DrawCard()

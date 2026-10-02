@@ -87,6 +87,33 @@ public class YakuWindowManager : MonoBehaviour
         windowRoot.SetActive(true);
     }
 
+    /// <summary>
+    /// 上がったときの精算（役の内訳・倍付け・最終点）を表示する
+    /// </summary>
+    public void ShowSettlement(List<string> lines, int total, Action onClose)
+    {
+        if (windowRoot == null || yakuNameText == null)
+        {
+            Debug.LogError("YakuWindowManager: 必要なUIコンポーネントがアサインされていません。");
+            onClose?.Invoke();
+            return;
+        }
+
+        string body = string.Join("\n", lines);
+        if (pointText != null)
+        {
+            yakuNameText.text = body;
+            pointText.text = $"計 {total} 文";
+        }
+        else
+        {
+            yakuNameText.text = $"{body}\n計 {total} 文";
+        }
+
+        _onCloseCallback = onClose;
+        windowRoot.SetActive(true);
+    }
+
     public void CloseWindow()
     {
         if (windowRoot != null)
