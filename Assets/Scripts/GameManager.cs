@@ -163,6 +163,9 @@ public class GameManager : MonoBehaviour
     {
         if (clickedCard == null) return;
 
+        // 役一覧を開いている間は札を操作できない
+        if (YakuListPanel.IsOpen) return;
+
         // --- 山札めくりで複数一致した場札の選択待ち中の場合 ---
         if (_currentState == TurnState.SelectingDeckMatch)
         {

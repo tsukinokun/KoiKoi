@@ -101,6 +101,9 @@ public class YakuWindowManager : MonoBehaviour
 
     private void Update()
     {
+        // 役一覧を開いている間のクリックで、出来役ウィンドウを閉じない
+        if (YakuListPanel.IsOpen) return;
+
         if (windowRoot != null && windowRoot.activeSelf)
         {
             if (Input.GetMouseButtonDown(0))

@@ -2,6 +2,7 @@
 using System.Linq;
 
 /// 獲得したカードのデータリストから成立している役を判定する純粋ロジッククラス
+/// 役の点数を変えたら、役一覧画面用の YakuCatalog も合わせて変更する
 public static class YakuEvaluator
 {
     public static List<YakuResult> CheckAllYaku(List<CardData> capturedCards)
